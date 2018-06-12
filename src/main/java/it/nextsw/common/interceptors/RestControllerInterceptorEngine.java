@@ -3,6 +3,7 @@ package it.nextsw.common.interceptors;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.EntityPathBase;
 import it.nextsw.common.annotations.Interceptor;
+import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,17 +24,16 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class RestControllerInterceptorEngine {
-    
+
     @Value(value = "${common.configuration.interceptors-package:it.bologna.ausl.shalbo.interceptors}")
     private String interceptorsPackage;
-    
+
     @Autowired
     private ListableBeanFactory beanFactory;
-    
+
     private static final Map<String, List<RestControllerInterceptor>> INTERCEPTORS = new ConcurrentHashMap<>();
-    
-    
-    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException {        
+
+    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException {
         fillInterceptorsCache();
         List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entityClass.getName());
         if (interceptors != null) {
@@ -43,8 +43,26 @@ public class RestControllerInterceptorEngine {
         }
         return initialPredicate;
     }
-    
-    public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException {        
+
+    public Object executeAfterSelectQueryInterceptor(Object entity, List<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, InterceptorException {
+        Object res = null;
+        fillInterceptorsCache();
+        List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entityClass.getName());
+        if (interceptors != null) {
+            for (RestControllerInterceptor interceptor : interceptors) {
+                if (entity != null) {
+                    res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
+                } else if (entities != null) {
+                    res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
+                } else {
+                    throw new InterceptorException("errore, sia entity che entities sono nulli, passane almeno uno");
+                }
+            }
+        }
+        return res;
+    }
+
+    public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException {
         fillInterceptorsCache();
         List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entity.getClass().getName());
         if (interceptors != null) {
@@ -54,7 +72,29 @@ public class RestControllerInterceptorEngine {
         }
         return entity;
     }
-    
+
+    public Object executebeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException {
+        fillInterceptorsCache();
+        List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entity.getClass().getName());
+        if (interceptors != null) {
+            for (RestControllerInterceptor interceptor : interceptors) {
+                entity = interceptor.beforeUpdateInterceptor(entity, additionalData, request);
+            }
+        }
+        return entity;
+    }
+
+    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException {
+        fillInterceptorsCache();
+        List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entity.getClass().getName());
+        if (interceptors != null) {
+            for (RestControllerInterceptor interceptor : interceptors) {
+                interceptor.beforeDeleteInterceptor(entity, additionalData, request);
+            }
+        }
+        return entity;
+    }
+
     private void fillInterceptorsCache() throws ClassNotFoundException {
         if (INTERCEPTORS == null || INTERCEPTORS.isEmpty()) {
             ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
@@ -65,8 +105,9 @@ public class RestControllerInterceptorEngine {
                 Class target = annotation.target();
 //                System.out.println("Trovato: " + bd.getBeanClassName() + " " + target + " " + annotation.name());
                 List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(target.getName());
-                if (interceptors == null)
+                if (interceptors == null) {
                     interceptors = new ArrayList<>();
+                }
                 interceptors.add((RestControllerInterceptor) interceptorFound);
                 INTERCEPTORS.put(target.getName(), interceptors);
             }

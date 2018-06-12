@@ -12,7 +12,7 @@ import com.querydsl.core.types.dsl.PathBuilder;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
-import it.nextsw.common.annotations.RepositoryDescriptor;
+import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
 import it.nextsw.common.repositories.CustomQueryDslRepository;
 import java.lang.reflect.Field;
@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -35,6 +37,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
@@ -72,14 +76,13 @@ public abstract class RestControllerEngine {
     @PersistenceContext
     protected EntityManager em;
 
+    /**
+     * mappa dei repository
+     */
     @Autowired
     @Qualifier(value = "customRepositoryMap")
-    private Map<String, CustomQueryDslRepository> customRepositoryMap;
+    protected Map<String, CustomQueryDslRepository> customRepositoryMap;
 
-//    public abstract Map<String, CustomQueryDslRepository> getRepositoryMap();
-//    private void setRepositoryMap() {
-//        this.repositoryMap = getRepositoryMap();
-//    }
     private Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
             return Splitter.on(",").withKeyValueSeparator("=").split(additionalData);
@@ -89,12 +92,14 @@ public abstract class RestControllerEngine {
     }
 
     protected Object get(Object id, HttpServletRequest request) throws RestControllerEngineException {
-        Object res;
+        Object res = null;
         try {
             //TODO: chiamare interceptor scrittura
             JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
             Optional<Object> entity = generalRepository.findById(id);
-            res = entity.get();
+            if (entity.isPresent()) {
+                res = entity.get();
+            }
         } catch (IllegalArgumentException ex) {
             throw new RestControllerEngineException(ex);
         }
@@ -173,15 +178,22 @@ public abstract class RestControllerEngine {
         }
     }
 
-    private Object updateChildEntity(Object entity, Object updatedChildEntity, String fieldName) throws NoSuchFieldException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-        Method setMethod = getSetMethod(entity.getClass(), fieldName);
-        setMethod.invoke(entity, updatedChildEntity);
-        return entity;
-    }
-
-    protected void delete(Object entity, HttpServletRequest request, String additionalData) throws RestControllerEngineException {
+//    private Object updateChildEntity(Object entity, Object updatedChildEntity, String fieldName) throws NoSuchFieldException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+//        Method setMethod = getSetMethod(entity.getClass(), fieldName);
+//        setMethod.invoke(entity, updatedChildEntity);
+//        return entity;
+//    }
+    protected void delete(Object entity, HttpServletRequest request, String additionalData) throws RestControllerEngineException, RollBackInterceptorException {
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
-        generalRepository.delete(entity);
+
+        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
+        try {
+            restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalDataMap);
+            generalRepository.delete(entity);
+        } catch (ClassNotFoundException ex) {
+            throw new RestControllerEngineException("errore nel delete", ex);
+        }
+
     }
 
     protected Object update(Object id, Object entity, Map<String, Object> data, HttpServletRequest request, String additionalData) throws RestControllerEngineException {
@@ -191,6 +203,9 @@ public abstract class RestControllerEngine {
             manageNestedEntity(res, data, request, additionalDataMap);
 
             JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
+
+            restControllerInterceptor.executebeforeUpdateInterceptor(entity, request, additionalDataMap);
+
             generalRepository.save(res);
             return res;
         } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException ex) {
@@ -201,41 +216,42 @@ public abstract class RestControllerEngine {
     private Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException {
 //        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         for (String key : data.keySet()) {
-            boolean noInsertFk = false;
-            Object value = data.get(key);
-            if (key.startsWith("fk_")) {
-                System.out.println("key: " + key);
-                key = key.substring("fk_".length());
-                noInsertFk = true;
-            }
+//            boolean noInsertFk = false;
+            if (!key.startsWith("fk_")) {
+                Object value = data.get(key);
+//            if (key.startsWith("fk_")) {
+//                System.out.println("key: " + key);
+//                key = key.substring("fk_".length());
+//                noInsertFk = true;
+//            }
 
-            Method setMethod = getSetMethod(entity.getClass(), key);
-            if (value != null) {
-                if (setMethod.getParameterTypes()[0].isAssignableFrom(Date.class)) {
+                Method setMethod = getSetMethod(entity.getClass(), key);
+                if (value != null) {
+                    if (setMethod.getParameterTypes()[0].isAssignableFrom(Date.class)) {
 //                    String pattern = "yyyy-MM-dd['T'HH:mm:ss.Z]";
 //                    DateTimeFormatter format = DateTimeFormatter.ofPattern(pattern);
 //                    LocalDateTime dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                    LocalDateTime dateTime;
-                    try {
-                        // giorno e ora
-                        dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                    } catch (Exception ex) {
-                        // solo giorno
-                        //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-                        dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
-                    }
+                        LocalDateTime dateTime;
+                        try {
+                            // giorno e ora
+                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                        } catch (Exception ex) {
+                            // solo giorno
+                            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
+                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                        }
 
-                    Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
-                    value = date;
-                } else {
-                    Field field = entity.getClass().getDeclaredField(key);
-                    if (entityReflectionUtils.isForeignKeyField(field)) { // caso delle fk
-                        Class<?> type = field.getType();
-                        if (noInsertFk) {
-                            ForeignKey fk = objectMapper.convertValue(value, ForeignKey.class);
-                            Object fkReference = em.getReference(type, fk.getId());
-                            value = fkReference;
-                        } else {
+                        Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
+                        value = date;
+                    } else {
+                        Field field = entity.getClass().getDeclaredField(key);
+                        if (entityReflectionUtils.isForeignKeyField(field)) { // caso delle fk
+                            Class<?> type = field.getType();
+//                        if (noInsertFk) {
+//                            ForeignKey fk = objectMapper.convertValue(value, ForeignKey.class);
+//                            Object fkReference = em.getReference(type, fk.getId());
+//                            value = fkReference;
+//                        } else {
                             value = objectMapper.convertValue(value, type);
                             // eliminiamo il campo id (se presente) nell'entità fk; altrimenti anzichè inserirla andrebbe a modificare quella esistente, identificata dall'id passato
                             Method setFkIdMethod = getSetMethod(value.getClass(), entityReflectionUtils.getPrimaryKeyField(value.getClass()).getName());
@@ -247,9 +263,8 @@ public abstract class RestControllerEngine {
                         }
                     }
                 }
+                setMethod.invoke(entity, value);
             }
-
-            setMethod.invoke(entity, value);
         }
         return entity;
     }
@@ -326,10 +341,32 @@ public abstract class RestControllerEngine {
 //            new PathBuilder(predicate.getType()-, BASE_URL)
             Optional<Object> entityOptional = generalRepository.findOne(findByIdExpression);
             if (entityOptional.isPresent()) {
-                resource = factory.createProjection(projectionClass, entityOptional.get());
+                Object entity = entityOptional.get();
+                try {
+                    // applicare afterselect interceptor
+                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityClass, request, additionalDataMap);
+                } catch (ClassNotFoundException | InterceptorException ex) {
+                    throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
+                }
+                if (entity != null) {
+                    resource = factory.createProjection(projectionClass, entity);
+                }
             }
         } else {
             Page entities = generalRepository.findAll(predicate, pageable);
+            try {
+                // applicare after select multiplo
+                ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
+                List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
+                entities = new PageImpl<>(res, entities.getPageable(), res.size());
+//                Page<Object> contactDtoPage = entities.map(o -> {  
+//                    final ContactDto contactDto = new ContactDto();
+//        //get values from contact entity and set them in contactDto
+//    //e.g. contactDto.setContactId(contact.getContactId());
+//    return contactDto;});
+            } catch (ClassNotFoundException | InterceptorException ex) {
+                throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
+            }
             Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             resource = assembler.toResource(projected);
         }
