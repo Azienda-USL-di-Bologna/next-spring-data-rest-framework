@@ -1,7 +1,6 @@
 package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
-import com.querydsl.core.types.dsl.EntityPathBase;
 import it.nextsw.common.annotations.Interceptor;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
