@@ -92,9 +92,9 @@ public class ForeignKeyExporter {
 
                 Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
                 Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
-                id = primaryKeyGetMethod.invoke(SourceEntity);
+                id = primaryKeyGetMethod.invoke(SourceEntity).toString();
                 targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                url = String.format("%s?%s.%s=%s", buildBaseUrl(targetEntityName), filterFieldName, primaryKeyField.getName(), id.toString());
+                url = String.format("%s?%s.%s=%s", buildBaseUrl(targetEntityName), filterFieldName, primaryKeyField.getName(), id);
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");
@@ -102,16 +102,18 @@ public class ForeignKeyExporter {
         } else {
             Method getFkMethod = SourceEntity.getClass().getMethod("get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
             Object fkEntity = getFkMethod.invoke(SourceEntity);
-            Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(fkEntity);
-            Method fkPrimaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(trueEntityClass);
-            Object fkId = fkPrimaryKeyGetMethod.invoke(fkEntity);
+            Class entityClass = getFkMethod.getReturnType();
+//            Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(fkEntity);
+            Method fkPrimaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(entityClass);
 
-            id = fkId;
-            targetEntityName = trueEntityClass.getSimpleName().toLowerCase();
-            url = String.format("%s/%s", buildBaseUrl(targetEntityName), fkId.toString());
+            targetEntityName = entityClass.getSimpleName().toLowerCase();
+            if (fkEntity != null) {
+                id = fkPrimaryKeyGetMethod.invoke(fkEntity).toString();
+                url = String.format("%s/%s", buildBaseUrl(targetEntityName), id);
+            }
         }
 
-        ForeignKey fk = new ForeignKey(id.toString(), targetEntityName, url);
+        ForeignKey fk = new ForeignKey(id, targetEntityName, url);
         return fk;
     }
 
