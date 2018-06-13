@@ -44,17 +44,25 @@ public class RestControllerInterceptorEngine {
     }
 
     public Object executeAfterSelectQueryInterceptor(Object entity, List<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, InterceptorException {
+
         Object res = null;
+
+        if (entity != null) {
+            res = entity;
+        } else if (entities != null) {
+            res = entities;
+        } else {
+            throw new InterceptorException("errore, sia entity che entities sono nulli, passane almeno uno");
+        }
+
         fillInterceptorsCache();
         List<RestControllerInterceptor> interceptors = INTERCEPTORS.get(entityClass.getName());
         if (interceptors != null) {
             for (RestControllerInterceptor interceptor : interceptors) {
                 if (entity != null) {
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
-                } else if (entities != null) {
-                    res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
                 } else {
-                    throw new InterceptorException("errore, sia entity che entities sono nulli, passane almeno uno");
+                    res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
                 }
             }
         }

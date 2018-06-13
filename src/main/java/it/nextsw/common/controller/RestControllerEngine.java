@@ -28,8 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -38,7 +36,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
@@ -94,7 +91,6 @@ public abstract class RestControllerEngine {
     protected Object get(Object id, HttpServletRequest request) throws RestControllerEngineException {
         Object res = null;
         try {
-            //TODO: chiamare interceptor scrittura
             JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
             Optional<Object> entity = generalRepository.findById(id);
             if (entity.isPresent()) {
