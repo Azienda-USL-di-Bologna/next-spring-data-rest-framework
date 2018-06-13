@@ -274,13 +274,9 @@ public abstract class RestControllerEngine {
         if (slashPos != -1) {
             repositoryKey = repositoryKey.substring(0, slashPos);
         }
-        System.out.println("Stampo la Mappa dei Repository");
-        for (String key : customRepositoryMap.keySet()) {
-            System.out.println(key + " = " + customRepositoryMap.get(key));
-        }
+
         CustomQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
-        System.out.println("Repository trovato " + generalRepository);
-        System.out.println("repository key " + repositoryKey);
+
 //        if (generalRepository == null) {
 //            Field[] declaredFields = getClass().getDeclaredFields();
 //            Field repositoryField = null;
@@ -300,7 +296,6 @@ public abstract class RestControllerEngine {
 //                throw new RestControllerEngineException("errore nel reperimento del repository corretto", ex);
 //            }
 //        }
-
         return generalRepository;
     }
 

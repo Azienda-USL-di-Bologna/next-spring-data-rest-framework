@@ -46,6 +46,8 @@ public class RepositoriesConfiguration {
     @Value("${common.configuration.repository-package}")
     private String repositoryPackage;
 
+    private final String JAR_CLASS_PREFIX = "BOOT-INF.classes";
+
     @Autowired
     private Map<String, CustomQueryDslRepository> repositoryMap;
 
@@ -55,10 +57,19 @@ public class RepositoriesConfiguration {
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
         for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
-            log.info("ClassInfo: " + info.getName());
-            if (info.getName().startsWith(repositoryPackage + ".")) {
-                log.info("trovato repository: " + info.getName());
-                Class<?> classz = info.load();
+            log.info("ClassInfo name: " + info.getName());
+            log.info("ClassInfo resource: " + info.getResourceName());
+            log.info("ClassInfo package: " + info.getPackageName());
+            if (info.getName().contains(repositoryPackage + ".")) {
+                Class<?> classz = null;
+                if (info.getName().startsWith(repositoryPackage + ".")) {
+                    log.info("trovato repository: " + info.getName());
+                    classz = info.load();
+                    log.info("loading class: " + info.getName());
+                } else if (info.getName().startsWith(JAR_CLASS_PREFIX + "." + repositoryPackage + ".")) {
+                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
+                    classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
+                }
                 RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
                 if (annotation != null) {
                     repositories.put(annotation.path(), (CustomQueryDslRepository) repositoryMap.get(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, classz.getSimpleName())));
