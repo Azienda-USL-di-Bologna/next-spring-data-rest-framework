@@ -5,6 +5,8 @@ import com.google.common.reflect.ClassPath;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -47,11 +49,15 @@ public class RepositoriesConfiguration {
     @Autowired
     private Map<String, CustomQueryDslRepository> repositoryMap;
 
+    private static final Logger log = LoggerFactory.getLogger(RepositoriesConfiguration.class);
+
     @Bean(name = "customRepositoryMap")
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
         for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
+            log.info("ClassInfo: " + info.getName());
             if (info.getName().startsWith(repositoryPackage + ".")) {
+                log.info("trovato repository: " + info.getName());
                 Class<?> classz = info.load();
                 RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
                 if (annotation != null) {
