@@ -354,7 +354,8 @@ public abstract class RestControllerEngine {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
                 List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
-                entities = new PageImpl<>(res, entities.getPageable(), res.size());
+//                entities = new PageImpl<>(res, entities.getPageable(), res.size());
+                entities = new PageImpl<>(res, entities.getPageable(), entities.getTotalElements());
 //                Page<Object> contactDtoPage = entities.map(o -> {  
 //                    final ContactDto contactDto = new ContactDto();
 //        //get values from contact entity and set them in contactDto
