@@ -278,7 +278,13 @@ public abstract class RestControllerEngine {
         if (slashPos != -1) {
             repositoryKey = repositoryKey.substring(0, slashPos);
         }
+        System.out.println("Stampo la Mappa dei Repository");
+        for (String key : customRepositoryMap.keySet()) {
+            System.out.println(key + " = " + customRepositoryMap.get(key));
+        }
         CustomQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
+        System.out.println("Repository trovato " + generalRepository);
+        System.out.println("repository key " + repositoryKey);
 //        if (generalRepository == null) {
 //            Field[] declaredFields = getClass().getDeclaredFields();
 //            Field repositoryField = null;
@@ -359,7 +365,7 @@ public abstract class RestControllerEngine {
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
                 List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
                 entities = new PageImpl<>(res, entities.getPageable(), res.size());
-//                Page<Object> contactDtoPage = entities.map(o -> {  
+//                Page<Object> contactDtoPage = entities.map(o -> {
 //                    final ContactDto contactDto = new ContactDto();
 //        //get values from contact entity and set them in contactDto
 //    //e.g. contactDto.setContactId(contact.getContactId());
