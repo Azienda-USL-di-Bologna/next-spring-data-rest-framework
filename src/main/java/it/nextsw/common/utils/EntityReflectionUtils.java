@@ -14,6 +14,7 @@ import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
 
@@ -24,8 +25,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class EntityReflectionUtils {
 
-    private String projectionPackage = "it.bologna.ausl.shalbo.entities.projections";
-    private String generatedProjectionPackage = "it.bologna.ausl.shalbo.entities.projections.generated";
+    @Value("${common.projection.package}")
+    private String projectionPackage;
+
+    @Value("${common.projection.generated.package}")
+    private String generatedProjectionPackage;
 
     public Class<?> getProjectionClass(String projection) {
         Class<?> projectionClass = null;
