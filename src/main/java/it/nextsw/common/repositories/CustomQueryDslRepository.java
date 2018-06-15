@@ -136,7 +136,7 @@ public interface CustomQueryDslRepository<E extends Object, ID extends Object, T
             case contains:
                 res = stringPath.contains(stringOperation.getValue());
                 break;
-            case containsIgnorecase:
+            case containsIgnoreCase:
                 res = stringPath.containsIgnoreCase(stringOperation.getValue());
                 break;
             case startsWith:

@@ -10,7 +10,7 @@ public class StringOperation {
         startsWith,
         startsWithIgnoreCase,
         contains,
-        containsIgnorecase,
+        containsIgnoreCase,
         equals,
         equalsIgnoreCase
     }
