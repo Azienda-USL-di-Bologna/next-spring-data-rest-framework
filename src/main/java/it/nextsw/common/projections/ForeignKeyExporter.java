@@ -4,6 +4,7 @@ import com.google.common.base.CaseFormat;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
+import it.nextsw.common.utils.CommonUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -18,6 +19,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -30,6 +32,9 @@ public class ForeignKeyExporter {
 
     @Autowired
     EntityReflectionUtils entityReflectionUtils;
+    
+    @Autowired
+    CommonUtils commonUtils;
 
     @Value("${custom.mapping.url.root}")
     String customMappingBasePath;
@@ -38,12 +43,16 @@ public class ForeignKeyExporter {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.
                         currentRequestAttributes()).getRequest();
-        System.out.println("get: " + currentRequest);
-        System.out.println("get: " + currentRequest.getServerName());
-        System.out.println("port: " + currentRequest.getServerPort());
-        System.out.println("port: " + currentRequest.getServerPort());
+ 
+        String hostName = commonUtils.getHostname(currentRequest);
 
-        String baseUrl = currentRequest.getScheme() + "://" + currentRequest.getServerName() + ":" + currentRequest.getServerPort() + customMappingBasePath + "/" + entityName.toLowerCase();
+//        System.out.println("get: " + currentRequest);
+//        System.out.println("get: " + currentRequest.getServerName());
+//        System.out.println("port: " + currentRequest.getServerPort());
+//        System.out.println("port: " + currentRequest.getServerPort());
+       
+        
+        String baseUrl = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + customMappingBasePath + "/" + entityName.toLowerCase();
 
         return baseUrl;
     }
