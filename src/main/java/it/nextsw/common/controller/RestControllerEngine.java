@@ -223,7 +223,7 @@ public abstract class RestControllerEngine {
 
                 Method setMethod = getSetMethod(entity.getClass(), key);
                 if (value != null) {
-                    if (setMethod.getParameterTypes()[0].isAssignableFrom(Date.class)) {
+                    if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
 //                    String pattern = "yyyy-MM-dd['T'HH:mm:ss.Z]";
 //                    DateTimeFormatter format = DateTimeFormatter.ofPattern(pattern);
 //                    LocalDateTime dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
@@ -237,8 +237,8 @@ public abstract class RestControllerEngine {
                             dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
                         }
 
-                        Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
-                        value = date;
+//                        Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
+                        value = dateTime;
                     } else {
                         Field field = entity.getClass().getDeclaredField(key);
                         if (entityReflectionUtils.isForeignKeyField(field)) { // caso delle fk

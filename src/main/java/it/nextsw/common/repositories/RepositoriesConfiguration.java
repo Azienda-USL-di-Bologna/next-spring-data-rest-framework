@@ -57,17 +57,17 @@ public class RepositoriesConfiguration {
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
         for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
-            log.info("ClassInfo name: " + info.getName());
-            log.info("ClassInfo resource: " + info.getResourceName());
-            log.info("ClassInfo package: " + info.getPackageName());
+//            log.info("ClassInfo name: " + info.getName());
+//            log.info("ClassInfo resource: " + info.getResourceName());
+//            log.info("ClassInfo package: " + info.getPackageName());
             if (info.getName().contains(repositoryPackage + ".")) {
                 Class<?> classz = null;
                 if (info.getName().startsWith(repositoryPackage + ".")) {
-                    log.info("trovato repository: " + info.getName());
+//                    log.info("trovato repository: " + info.getName());
                     classz = info.load();
-                    log.info("loading class: " + info.getName());
+//                    log.info("loading class: " + info.getName());
                 } else if (info.getName().startsWith(JAR_CLASS_PREFIX + "." + repositoryPackage + ".")) {
-                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
+//                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                     classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                 }
                 RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
