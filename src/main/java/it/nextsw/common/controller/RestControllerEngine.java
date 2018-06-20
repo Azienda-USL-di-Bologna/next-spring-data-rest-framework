@@ -146,7 +146,9 @@ public abstract class RestControllerEngine {
             // se ci sono stati passati dei campi ForeignKey (cioè che iniziano per "fk_") vuol dire che non dobbiamo inserire l'entità fk, ma usarne una già esistente
             if (key.startsWith("fk_")) {
                 // troviamo il campo sulla classe dell'entità corrispondente alla fk (cioè quello il cui nome è ottenuto togliendo il prefisso "fk_")
-                Field fkField = fieldValue.getClass().getDeclaredField(key.substring("fk_".length()));
+                String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, key.substring("fk_".length()));
+                
+                Field fkField = fieldValue.getClass().getDeclaredField(fieldName);
 
                 // il valore del campo è l'oggetto ForeignKey, del quale ci serve solo l'id
                 Object foregnKeyObject = childMapValue.get(key);

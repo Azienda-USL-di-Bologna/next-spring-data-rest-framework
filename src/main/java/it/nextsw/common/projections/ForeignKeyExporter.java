@@ -45,38 +45,11 @@ public class ForeignKeyExporter {
                         currentRequestAttributes()).getRequest();
  
         String hostName = commonUtils.getHostname(currentRequest);
-
-//        System.out.println("get: " + currentRequest);
-//        System.out.println("get: " + currentRequest.getServerName());
-//        System.out.println("port: " + currentRequest.getServerPort());
-//        System.out.println("port: " + currentRequest.getServerPort());
-       
-        
         String baseUrl = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + customMappingBasePath + "/" + entityName.toLowerCase();
 
         return baseUrl;
     }
 
-//    public ForeignKey toForeignKeyTemp(Object targetEntity) throws IOException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-//
-//        ForeignKey fk = new ForeignKey();
-//        Method getIdMethod = targetEntity.getClass().getDeclaredMethod("getId");
-//        Object id = getIdMethod.invoke(targetEntity);
-//
-//        String entityClass;
-//        if (targetEntity.getClass().getSuperclass().isAssignableFrom(Object.class)) {
-//            entityClass = targetEntity.getClass().getSimpleName();
-//        } else {
-//            entityClass = targetEntity.getClass().getSuperclass().getSimpleName();
-//        }
-//
-//        String url = buildBaseUrl(entityClass) + "/" + id.toString();
-//
-//        fk.setId(id.toString());
-//        fk.setUrl(url);
-//
-//        return fk;
-//    }
     public ForeignKey toForeignKey(String fieldName, Object SourceEntity) throws ClassNotFoundException, NoSuchFieldException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ServletException, EntityReflectionException {
         Object id = null;
         String targetEntityName = null;
@@ -101,7 +74,7 @@ public class ForeignKeyExporter {
 
                 Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
                 Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
-                id = primaryKeyGetMethod.invoke(SourceEntity).toString();
+                id = primaryKeyGetMethod.invoke(SourceEntity);
                 targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
                 url = String.format("%s?%s.%s=%s", buildBaseUrl(targetEntityName), filterFieldName, primaryKeyField.getName(), id);
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
@@ -117,7 +90,7 @@ public class ForeignKeyExporter {
 
             targetEntityName = entityClass.getSimpleName().toLowerCase();
             if (fkEntity != null) {
-                id = fkPrimaryKeyGetMethod.invoke(fkEntity).toString();
+                id = fkPrimaryKeyGetMethod.invoke(fkEntity);
                 url = String.format("%s/%s", buildBaseUrl(targetEntityName), id);
             }
         }
