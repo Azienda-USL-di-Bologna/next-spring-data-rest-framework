@@ -18,8 +18,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.util.StringUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -27,12 +26,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * @author gdm
  */
-@Configuration
+@Component
 public class ForeignKeyExporter {
 
     @Autowired
     EntityReflectionUtils entityReflectionUtils;
-    
+
     @Autowired
     CommonUtils commonUtils;
 
@@ -43,7 +42,7 @@ public class ForeignKeyExporter {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.
                         currentRequestAttributes()).getRequest();
- 
+
         String hostName = commonUtils.getHostname(currentRequest);
         String baseUrl = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + customMappingBasePath + "/" + entityName.toLowerCase();
 

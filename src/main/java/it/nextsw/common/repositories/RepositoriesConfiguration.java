@@ -56,6 +56,9 @@ public class RepositoriesConfiguration {
     @Bean(name = "customRepositoryMap")
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
+
+        // cicliamo su tutte le classi repository. Da prima cerca su tutto il classpath e poi si guarda se comprende il
+        // package repsitory package
         for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
 //            log.info("ClassInfo name: " + info.getName());
 //            log.info("ClassInfo resource: " + info.getResourceName());
@@ -70,6 +73,7 @@ public class RepositoriesConfiguration {
 //                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                     classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                 }
+                // guardo se ha la notazione del repository
                 RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
                 if (annotation != null) {
                     repositories.put(annotation.path(), (CustomQueryDslRepository) repositoryMap.get(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, classz.getSimpleName())));
