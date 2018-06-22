@@ -2,7 +2,7 @@ package it.nextsw.common.controller.exceptions;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 public class RestControllerEngineException extends Exception {
 

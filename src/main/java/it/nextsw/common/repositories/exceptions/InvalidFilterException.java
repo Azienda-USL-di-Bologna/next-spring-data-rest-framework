@@ -2,7 +2,7 @@ package it.nextsw.common.repositories.exceptions;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 public class InvalidFilterException extends Exception {
 
