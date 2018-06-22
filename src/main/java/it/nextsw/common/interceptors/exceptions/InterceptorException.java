@@ -2,7 +2,7 @@ package it.nextsw.common.interceptors.exceptions;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 public class InterceptorException extends Exception {
 

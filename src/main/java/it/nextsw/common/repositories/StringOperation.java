@@ -2,7 +2,7 @@ package it.nextsw.common.repositories;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 public class StringOperation {
 

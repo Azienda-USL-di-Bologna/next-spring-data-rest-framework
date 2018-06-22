@@ -15,7 +15,7 @@ import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 @Configuration
 public class RepositoriesConfiguration {
@@ -57,12 +57,11 @@ public class RepositoriesConfiguration {
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
 
-        // cicliamo su tutte le classi repository. Da prima cerca su tutto il classpath e poi si guarda se comprende il
-        // package repsitory package
+        /**
+         * si cicla su tutte le classi repository; prima si cerca su tutto il
+         * classpath e poi si guarda se comprende il package repository
+         */
         for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
-//            log.info("ClassInfo name: " + info.getName());
-//            log.info("ClassInfo resource: " + info.getResourceName());
-//            log.info("ClassInfo package: " + info.getPackageName());
             if (info.getName().contains(repositoryPackage + ".")) {
                 Class<?> classz = null;
                 if (info.getName().startsWith(repositoryPackage + ".")) {
@@ -73,7 +72,7 @@ public class RepositoriesConfiguration {
 //                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                     classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
                 }
-                // guardo se ha la notazione del repository
+                // si vede se ha la notazione del repository
                 RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
                 if (annotation != null) {
                     repositories.put(annotation.path(), (CustomQueryDslRepository) repositoryMap.get(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, classz.getSimpleName())));

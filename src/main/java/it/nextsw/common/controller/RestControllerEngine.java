@@ -20,10 +20,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +42,7 @@ import org.springframework.hateoas.ResourceAssembler;
 
 /**
  *
- * @author Utente
+ * @author spritz
  */
 //@RestController
 public abstract class RestControllerEngine {
@@ -88,6 +86,15 @@ public abstract class RestControllerEngine {
         }
     }
 
+    /**
+     * metodo che restituisce, se esiste, l'entity richiesta prendendola dal
+     * repository
+     *
+     * @param id
+     * @param request
+     * @return
+     * @throws RestControllerEngineException
+     */
     protected Object get(Object id, HttpServletRequest request) throws RestControllerEngineException {
         Object res = null;
         try {
@@ -102,28 +109,54 @@ public abstract class RestControllerEngine {
         return res;
     }
 
+    /**
+     * Inserimento di una nuova entity
+     *
+     * @param data - dati grezzi passati nella richiesta
+     * @param entityClass - classe dell'entità
+     * @param request
+     * @param additionalData
+     * @return
+     * @throws RestControllerEngineException
+     * @throws RollBackInterceptorException
+     */
     protected Object insert(Map<String, Object> data, Class entityClass, HttpServletRequest request, String additionalData) throws RestControllerEngineException, RollBackInterceptorException {
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
-        // si reperisce il repository
+        // istanziazione del repository corretto
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
         try {
-            // otteniamo l'oggetto entity a partire dalla mappa dei dati grezzi passati nella richiesta
+            /**
+             * costruzione dell'oggetto entity a partire dalla mappa dei dati
+             * "grezzi" espressi in (chiave-valore) passati nella richiesta
+             * attraverso fasterxml.jackson
+             */
             Object entity = objectMapper.convertValue(data, entityClass);
 
-            // togliamo l'eventuale id(passato), chiamando il metodo setId con null
+            /**
+             * eliminazione dell'eventuale id passato (nell'inserimento l'id
+             * sarà calcolato e non deve essere considerato se passato),
+             * chiamando il metodo setId passando come valore null
+             */
             Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(entity);
-            // prendiamo il metodo set della primary key e lo settiamo a null
+            // si ottiene il metodo set della primary key e lo si setta a null
             primaryKeySetMethod.invoke(entity, (Object) null);
             System.out.println(String.format("sto invocando %s.%s(%s)", entity.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
-            // gestione di inserimento su oggetti annidati
+            /**
+             * gestione di inserimento / gestione degli oggetti annidati. Qui
+             * saranno considerati anche gli eventuali interceptor settati per
+             * le entità figlie
+             */
             manageNestedEntity(entity, data, request, additionalDataMap);
 
-            // interceptor su entità padre, prima sono state fatte su entità figlie
+            /**
+             * interceptor su entità padre (gli interceptor su entità figlie
+             * sono già state fatte prima)
+             */
             entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalDataMap);
 
-            // persistiamo l'entità
+            // inserimento dell'entità
             generalRepository.save(entity);
-            // ritorniamo l'entità inserita
+            // viene ritornata l'entità inserita con tutti i campi, compreso l'id generato
             return entity;
         } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchFieldException | SecurityException | ClassNotFoundException ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
@@ -131,6 +164,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
+     * Gestione delle entity innestate
      *
      * @param fieldValue
      * @param childMap
@@ -148,24 +182,44 @@ public abstract class RestControllerEngine {
     private void manageNestedEntity(Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, RollBackInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
         Map<String, Object> childMapValue = (Map<String, Object>) childMap;
         for (String key : childMapValue.keySet()) {
-            // se ci sono stati passati dei campi ForeignKey (cioè che iniziano per "fk_") vuol dire che non dobbiamo inserire l'entità fk, ma usarne una già esistente
+            /**
+             * se sono stati passati dei campi ForeignKey (cioè che iniziano con
+             * la stringa "fk_") vuol dire che non si deve inserire l'entità di
+             * foreign key, ma usarne una già esistente
+             */
             if (key.startsWith("fk_")) {
-                // troviamo il campo sulla classe dell'entità corrispondente alla fk (cioè quello il cui nome è ottenuto togliendo il prefisso "fk_")
+                /**
+                 * si cerca il campo sulla classe dell'entità corrispondente
+                 * alla fk, cioè quello il cui nome è ottenuto togliendo il
+                 * prefisso "fk_"
+                 */
                 String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, key.substring("fk_".length()));
 
                 Field fkField = fieldValue.getClass().getDeclaredField(fieldName);
 
-                // il valore del campo è l'oggetto ForeignKey, del quale ci serve solo l'id
+                /**
+                 * il valore del campo è l'oggetto ForeignKey, del quale serve
+                 * solo l'id
+                 */
                 Object foregnKeyObject = childMapValue.get(key);
                 ForeignKey fk = objectMapper.convertValue(foregnKeyObject, ForeignKey.class);
 
-                // creiamo l'entità tramite entity manager in modo che hiberante capisca che non la deve inserire
+                /**
+                 * viene creata l'entità tramite entity manager in modo che
+                 * hibernate capisca che non la deve inserire
+                 */
                 Object fkReference = em.getReference(fkField.getType(), fk.getId());
 
-                // troviamo il campo che setta la fk sulla classe dell'entità e la settiamo
+                /**
+                 * si ottiene il campo che setta la fk sulla classe dell'entità
+                 * e viene invocato per settarla
+                 */
                 Method setFkMethod = getSetMethod(fieldValue.getClass(), fkField.getName());
                 setFkMethod.invoke(fieldValue, fkReference);
             } else {
+                /**
+                 * caso in cui è necessario inserire l'entity
+                 */
                 Method getMethod = getGetMethod(fieldValue.getClass(), key);
                 Object fieldChildValue = getMethod.invoke(fieldValue);
                 if (fieldChildValue != null && entityReflectionUtils.isEntityClass(fieldChildValue.getClass())) {
@@ -173,8 +227,9 @@ public abstract class RestControllerEngine {
                     Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(fieldChildValue);
                     primaryKeySetMethod.invoke(fieldChildValue, (Object) null);
                     System.out.println(String.format("sto invocando %s.%s(%s)", fieldChildValue.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
-                    // lanciamo l'iterceptor
+                    // si lancia l'interceptor
                     fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
+                    // si richiama il metodo se ci sono altre entità innestate
                     manageNestedEntity(fieldChildValue, childMapValue.get(key), request, additionalDataMap);
                 }
             }
@@ -186,6 +241,15 @@ public abstract class RestControllerEngine {
 //        setMethod.invoke(entity, updatedChildEntity);
 //        return entity;
 //    }
+    /**
+     * Cancellazione di un'entity
+     *
+     * @param entity - entità da eliminare
+     * @param request
+     * @param additionalData
+     * @throws RestControllerEngineException
+     * @throws RollBackInterceptorException
+     */
     protected void delete(Object entity, HttpServletRequest request, String additionalData) throws RestControllerEngineException, RollBackInterceptorException {
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
 
@@ -199,12 +263,23 @@ public abstract class RestControllerEngine {
 
     }
 
+    /**
+     * Aggiornamento di un'entity esistente
+     *
+     * @param id
+     * @param entity
+     * @param data
+     * @param request
+     * @param additionalData
+     * @return
+     * @throws RestControllerEngineException
+     */
     protected Object update(Object id, Object entity, Map<String, Object> data, HttpServletRequest request, String additionalData) throws RestControllerEngineException {
         try {
             Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
-            // fa il merge sulla classe padre
+            // si effettua il merge sulla classe padre
             Object res = merge(data, entity, request, additionalDataMap);
-            // fa il merge sulle entità figlie
+            // si effettua il merge sulle entità figlie
             manageNestedEntity(res, data, request, additionalDataMap);
 
             JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
@@ -322,6 +397,21 @@ public abstract class RestControllerEngine {
         return res;
     }
 
+    /**
+     * Reperimento delle risorse, considerando il caso si richiedano tutti, una
+     * sola (passando 'id) e considerando anche le eventuali projection
+     *
+     * @param request
+     * @param id
+     * @param projection
+     * @param predicate
+     * @param pageable
+     * @param additionalData
+     * @param path
+     * @param entityClass
+     * @return
+     * @throws RestControllerEngineException
+     */
     protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException {
         Object resource = null;
         Class projectionClass;
@@ -334,46 +424,70 @@ public abstract class RestControllerEngine {
             throw new RestControllerEngineException("errore nel reperimento della projection class", ex);
         }
 
-        // qui si vuole il repository, ma essendo una funzione generica, tutti i nostri repository estendono CustomQueryDslRepository
-        // quindi ogni nostro repository è anche di tipo CustomQueryDslRepository
-        // Spring ha una mappa valore repository e la chiave il nome della classe con lowerCamelcase; per capire dalla richiesta quale repository usare,
+        /**
+         * qui serve il repository specifico, ma essendo qui in una funzione
+         * generica, tutti i nostri repository estendono
+         * CustomQueryDslRepository; così facendo si ha un'interfaccia (quella
+         * di repository) che estende un'altra interfaccia
+         * (CustomQueryDslRepository), avendo così due tipi disponibili. Così
+         * facendo ogni nostro repository è anche di tipo
+         * CustomQueryDslRepository.
+         *
+         * Spring ha una mappa dove la chiave ha il nome della classe in
+         * lowerCamelcase mentre il valore corrisponde al valore dei repository
+         */
         CustomQueryDslRepository generalRepository = getGeneralRepository(request);
         try {
+            // inserimento come predicato dell'eventuale interceptor
             predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap);
         } catch (ClassNotFoundException ex) {
             throw new RestControllerEngineException(ex);
         }
-        // guardo se ho passato un id specifico da ricercare
+        // controllo se è stato passato un id specifico da ricercare
         if (id != null) {
-            // PathBuiler è generico per create predicati; getPrimaryKeyField: qual è il nome realte della chiave primaria della classe
+            /**
+             * PathBuilder è una classe generica per create predicati;
+             * getPrimaryKeyField: metodo che fornisce il nome reale della
+             * chiave primaria della classe
+             */
             BooleanExpression findByIdExpression = new PathBuilder(
                     BooleanExpression.class, path.getRoot().toString()).
                     get(entityReflectionUtils.getPrimaryKeyField((Class) path.getAnnotatedElement()).getName()).eq(id).
                     and(predicate);
 //            Object entity = ((JpaRepository) generalRepository).findById(id).get();
 //            new PathBuilder(predicate.getType()-, BASE_URL)
+
             // avendo la query la si esegue sul repository
             Optional<Object> entityOptional = generalRepository.findOne(findByIdExpression);
-            // controllo la presenza del risultato
+            // controllo della presenza del risultato
             if (entityOptional.isPresent()) {
+                // si ottiene la entity
                 Object entity = entityOptional.get();
                 try {
-                    // applicare afterselect interceptor
+                    // applicazione di afterSelectQueryInterceptor
                     entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityClass, request, additionalDataMap);
                 } catch (ClassNotFoundException | InterceptorException ex) {
                     throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
                 }
                 if (entity != null) {
-                    // applica la pojection nel singolo elemento
+                    // applicazione della projection nel singolo elemento
                     resource = factory.createProjection(projectionClass, entity);
                 }
             }
         } else {
+            /**
+             * caso in cui non è stato passato un id specifico da ricercare,
+             * quindi lo devo fare su tutti i record di una classe
+             */
             Page entities = generalRepository.findAll(predicate, pageable);
             try {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
-                // spacchettiamo la page, passiamo tutto all'interceptor e poi si ricrea la Page
+                /**
+                 * si spacchetta la Page che contiene le entity e si passa il
+                 * tutto all'interceptor; una volta applicato l'interceptor
+                 * viene ricreata la Page
+                 */
                 List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
 //                entities = new PageImpl<>(res, entities.getPageable(), res.size());
                 entities = new PageImpl<>(res, entities.getPageable(), entities.getTotalElements());
@@ -385,7 +499,7 @@ public abstract class RestControllerEngine {
             } catch (ClassNotFoundException | InterceptorException ex) {
                 throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
             }
-            // per ogni elemento della pagina gli applica la create projection
+            // per ogni elemento della pagina gli si applica la createProjection
             Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             // assembla il risultato in HAL
             resource = assembler.toResource(projected);
@@ -393,6 +507,15 @@ public abstract class RestControllerEngine {
         return resource;
     }
 
+    /**
+     * Reperimento del metodo set di un particolare campo, di una particolare
+     * classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     * @throws RestControllerEngineException
+     */
     private Method getSetMethod(Class entityClass, String fieldName) throws RestControllerEngineException {
         List<Method> methodsFound = new ArrayList<>();
         for (Method declaredMethod : entityClass.getDeclaredMethods()) {
@@ -409,6 +532,15 @@ public abstract class RestControllerEngine {
         return methodsFound.get(0);
     }
 
+    /**
+     * Reperimento del metodo get di un particolare campo, di una particolare
+     * classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     * @throws RestControllerEngineException
+     */
     private Method getGetMethod(Class entityClass, String fieldName) throws RestControllerEngineException {
         List<Method> methodsFound = new ArrayList<>();
         for (Method declaredMethod : entityClass.getDeclaredMethods()) {
