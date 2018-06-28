@@ -146,7 +146,7 @@ public abstract class RestControllerEngine {
              * saranno considerati anche gli eventuali interceptor settati per
              * le entità figlie
              */
-            manageNestedEntity(entity, data, request, additionalDataMap);
+            manageNestedEntity(true, entity, data, request, additionalDataMap);
 
             /**
              * interceptor su entità padre (gli interceptor su entità figlie
@@ -158,7 +158,7 @@ public abstract class RestControllerEngine {
             generalRepository.save(entity);
             // viene ritornata l'entità inserita con tutti i campi, compreso l'id generato
             return entity;
-        } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchFieldException | SecurityException | ClassNotFoundException ex) {
+        } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchFieldException | SecurityException | ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
         }
     }
@@ -179,7 +179,7 @@ public abstract class RestControllerEngine {
      * @throws NoSuchMethodException
      * @throws NoSuchFieldException
      */
-    private void manageNestedEntity(Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, RollBackInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
+    private void manageNestedEntity(boolean insert, Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, RollBackInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException, EntityReflectionException {
         Map<String, Object> childMapValue = (Map<String, Object>) childMap;
         for (String key : childMapValue.keySet()) {
             /**
@@ -193,9 +193,8 @@ public abstract class RestControllerEngine {
                  * alla fk, cioè quello il cui nome è ottenuto togliendo il
                  * prefisso "fk_"
                  */
-                String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, key.substring("fk_".length()));
-
-                Field fkField = fieldValue.getClass().getDeclaredField(fieldName);
+                String fieldName = key.substring("fk_".length());                
+                Field fkField = entityReflectionUtils.getEntityFromProxyObject(fieldValue).getDeclaredField(fieldName);
 
                 /**
                  * il valore del campo è l'oggetto ForeignKey, del quale serve
@@ -222,25 +221,39 @@ public abstract class RestControllerEngine {
                  */
                 Method getMethod = getGetMethod(fieldValue.getClass(), key);
                 Object fieldChildValue = getMethod.invoke(fieldValue);
-                if (fieldChildValue != null && entityReflectionUtils.isEntityClass(fieldChildValue.getClass())) {
-                    // togliamo l'eventuale id(passato), chiamando il metodo setId con null
-                    Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(fieldChildValue);
-                    primaryKeySetMethod.invoke(fieldChildValue, (Object) null);
-                    System.out.println(String.format("sto invocando %s.%s(%s)", fieldChildValue.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
-                    // si lancia l'interceptor
-                    fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
+                Object dataChildValue = childMapValue.get(key);
+                if (fieldChildValue != null && entityReflectionUtils.isEntityClassFromProxyObject(fieldChildValue.getClass())) {
+                    if (!insert) {
+                        Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildValue.getClass());
+                        Object id = ((Map<String, Object>)dataChildValue).get(primaryKeyField.getName());
+                        if (id != null) {
+                            System.out.println("trovato id: " + id);
+                            fieldChildValue = merge((Map<String, Object>) dataChildValue, fieldChildValue, request, additionalDataMap);
+                            fieldChildValue = restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildValue, request, additionalDataMap);
+                        }
+                        else {
+                            Method setMethod = getSetMethod(fieldValue.getClass(), key);
+                            Class<?> type = entityReflectionUtils.getEntityFromProxyObject(fieldChildValue);
+                            Object value = objectMapper.convertValue(dataChildValue, type);
+                            fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
+                            setMethod.invoke(fieldValue, value);
+                        }
+                    }
+                    else {
+                        // togliamo l'eventuale id(passato), chiamando il metodo setId con null
+                        Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(fieldChildValue);
+                        System.out.println(String.format("sto invocando %s.%s(%s)", fieldChildValue.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
+                        primaryKeySetMethod.invoke(fieldChildValue, (Object) null);
+                        // lanciamo l'interceptor
+                        fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
+                    }
                     // si richiama il metodo se ci sono altre entità innestate
-                    manageNestedEntity(fieldChildValue, childMapValue.get(key), request, additionalDataMap);
+                    manageNestedEntity(insert, fieldChildValue, dataChildValue, request, additionalDataMap);
                 }
             }
         }
     }
 
-//    private Object updateChildEntity(Object entity, Object updatedChildEntity, String fieldName) throws NoSuchFieldException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-//        Method setMethod = getSetMethod(entity.getClass(), fieldName);
-//        setMethod.invoke(entity, updatedChildEntity);
-//        return entity;
-//    }
     /**
      * Cancellazione di un'entity
      *
@@ -257,7 +270,7 @@ public abstract class RestControllerEngine {
         try {
             restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalDataMap);
             generalRepository.delete(entity);
-        } catch (ClassNotFoundException ex) {
+        } catch (ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         }
 
@@ -280,7 +293,7 @@ public abstract class RestControllerEngine {
             // si effettua il merge sulla classe padre
             Object res = merge(data, entity, request, additionalDataMap);
             // si effettua il merge sulle entità figlie
-            manageNestedEntity(res, data, request, additionalDataMap);
+            manageNestedEntity(false, res, data, request, additionalDataMap);
 
             JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
 
@@ -288,22 +301,15 @@ public abstract class RestControllerEngine {
 
             generalRepository.save(res);
             return res;
-        } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException ex) {
+        } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'update", ex);
         }
     }
 
-    private Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException {
-//        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+    private Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException, EntityReflectionException {
         for (String key : data.keySet()) {
-//            boolean noInsertFk = false;
             if (!key.startsWith("fk_")) {
                 Object value = data.get(key);
-//            if (key.startsWith("fk_")) {
-//                System.out.println("key: " + key);
-//                key = key.substring("fk_".length());
-//                noInsertFk = true;
-//            }
 
                 Method setMethod = getSetMethod(entity.getClass(), key);
                 if (value != null) {
@@ -323,16 +329,14 @@ public abstract class RestControllerEngine {
 
 //                        Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
                         value = dateTime;
+                        setMethod.invoke(entity, value);
                     } else {
-                        Field field = entity.getClass().getDeclaredField(key);
+                        Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
+                        Field field = trueEntityClass.getDeclaredField(key);
                         if (entityReflectionUtils.isForeignKeyField(field)) { // caso delle fk
                             Class<?> type = field.getType();
-//                        if (noInsertFk) {
-//                            ForeignKey fk = objectMapper.convertValue(value, ForeignKey.class);
-//                            Object fkReference = em.getReference(type, fk.getId());
-//                            value = fkReference;
-//                        } else {
                             value = objectMapper.convertValue(value, type);
+
                             // eliminiamo il campo id (se presente) nell'entità fk; altrimenti anzichè inserirla andrebbe a modificare quella esistente, identificata dall'id passato
                             Method setFkIdMethod = getSetMethod(value.getClass(), entityReflectionUtils.getPrimaryKeyField(value.getClass()).getName());
                             try {
@@ -341,18 +345,18 @@ public abstract class RestControllerEngine {
                                 throw new RestControllerEngineException(String.format("errore nell'eliminazione del campo id della fk %s", key), ex);
                             }
                         }
+                        else {
+                            setMethod.invoke(entity, value);
+                        }
                     }
                 }
-                setMethod.invoke(entity, value);
+//                setMethod.invoke(entity, value);
             }
         }
         return entity;
     }
 
     protected CustomQueryDslRepository getGeneralRepository(HttpServletRequest request) throws RestControllerEngineException {
-//        if (this.repositoryMap == null) {
-//            setRepositoryMap();
-//        }
         String repositoryKey = request.getServletPath().substring(BASE_URL.length() + 1);
         int slashPos = repositoryKey.indexOf("/");
         if (slashPos != -1) {
@@ -360,26 +364,6 @@ public abstract class RestControllerEngine {
         }
 
         CustomQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
-
-//        if (generalRepository == null) {
-//            Field[] declaredFields = getClass().getDeclaredFields();
-//            Field repositoryField = null;
-//            for (Field declaredField : declaredFields) {
-//                RepositoryDescriptor annotation = declaredField.getAnnotation(RepositoryDescriptor.class);
-//                if (entityReflectionUtils.isRepositoryClass(declaredField.getType())) {
-//                    if (request.getServletPath().startsWith(BASE_URL + "/" + annotation.repositoryPath())) {
-//                        repositoryField = declaredField;
-//                        break;
-//                    }
-//                }
-//            }
-//            try {
-//                generalRepository = (CustomQueryDslRepository) repositoryField.get(this);
-//                GENERAL_REPOSITORY_MAP.put(request.getServletPath(), generalRepository);
-//            } catch (IllegalArgumentException | IllegalAccessException ex) {
-//                throw new RestControllerEngineException("errore nel reperimento del repository corretto", ex);
-//            }
-//        }
         return generalRepository;
     }
 
@@ -440,7 +424,7 @@ public abstract class RestControllerEngine {
         try {
             // inserimento come predicato dell'eventuale interceptor
             predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap);
-        } catch (ClassNotFoundException ex) {
+        } catch (ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException(ex);
         }
         // controllo se è stato passato un id specifico da ricercare
@@ -466,7 +450,7 @@ public abstract class RestControllerEngine {
                 try {
                     // applicazione di afterSelectQueryInterceptor
                     entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityClass, request, additionalDataMap);
-                } catch (ClassNotFoundException | InterceptorException ex) {
+                } catch (ClassNotFoundException | InterceptorException | EntityReflectionException ex) {
                     throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
                 }
                 if (entity != null) {
@@ -489,14 +473,9 @@ public abstract class RestControllerEngine {
                  * viene ricreata la Page
                  */
                 List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
-//                entities = new PageImpl<>(res, entities.getPageable(), res.size());
                 entities = new PageImpl<>(res, entities.getPageable(), entities.getTotalElements());
-//                Page<Object> contactDtoPage = entities.map(o -> {
-//                    final ContactDto contactDto = new ContactDto();
-//        //get values from contact entity and set them in contactDto
-//    //e.g. contactDto.setContactId(contact.getContactId());
-//    return contactDto;});
-            } catch (ClassNotFoundException | InterceptorException ex) {
+
+            } catch (ClassNotFoundException | InterceptorException | EntityReflectionException ex) {
                 throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
             }
             // per ogni elemento della pagina gli si applica la createProjection

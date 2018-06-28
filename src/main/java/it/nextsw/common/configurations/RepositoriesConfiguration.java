@@ -1,7 +1,8 @@
-package it.nextsw.common.repositories;
+package it.nextsw.common.configurations;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.reflect.ClassPath;
+import it.nextsw.common.repositories.CustomQueryDslRepository;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
