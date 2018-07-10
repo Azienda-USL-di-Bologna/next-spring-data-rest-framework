@@ -4,6 +4,7 @@ import it.nextsw.common.annotations.Interceptor;
 import it.nextsw.common.interceptors.RestControllerInterceptor;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,19 +37,32 @@ public class InterceptorsConfiguration {
     public Map<String, List<RestControllerInterceptor>> interceptorsMap() throws ClassNotFoundException, IOException {
         Map<String, List<RestControllerInterceptor>> interceptorsMap = new HashMap();
 
-            ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
-            scanner.addIncludeFilter(new AnnotationTypeFilter(Interceptor.class));
-            for (BeanDefinition bd : scanner.findCandidateComponents(interceptorsPackage)) {
-                Object interceptorFound = beanFactory.getBean(Class.forName(bd.getBeanClassName()));
-                Interceptor annotation = interceptorFound.getClass().getAnnotation(Interceptor.class);
-                Class target = annotation.target();
+        Map<String, Object> interceptorBeansMap = beanFactory.getBeansWithAnnotation(it.nextsw.common.annotations.Interceptor.class);
+        Collection<Object> interceptorBeans = interceptorBeansMap.values();
+        for (Object interceptorBean: interceptorBeans) {
+            Interceptor annotation = interceptorBean.getClass().getAnnotation(Interceptor.class);
+            Class target = annotation.target();
                 List<RestControllerInterceptor> interceptors = interceptorsMap.get(target.getName());
                 if (interceptors == null) {
                     interceptors = new ArrayList<>();
                 }
-                interceptors.add((RestControllerInterceptor) interceptorFound);
+                interceptors.add((RestControllerInterceptor) interceptorBean);
                 interceptorsMap.put(target.getName(), interceptors);
-            }
+        }
+        
+//            ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
+//            scanner.addIncludeFilter(new AnnotationTypeFilter(Interceptor.class));
+//            for (BeanDefinition bd : scanner.findCandidateComponents(interceptorsPackage)) {
+//                Object interceptorFound = beanFactory.getBean(Class.forName(bd.getBeanClassName()));
+//                Interceptor annotation = interceptorFound.getClass().getAnnotation(Interceptor.class);
+//                Class target = annotation.target();
+//                List<RestControllerInterceptor> interceptors = interceptorsMap.get(target.getName());
+//                if (interceptors == null) {
+//                    interceptors = new ArrayList<>();
+//                }
+//                interceptors.add((RestControllerInterceptor) interceptorFound);
+//                interceptorsMap.put(target.getName(), interceptors);
+//            }
         return interceptorsMap;
     }
 }
