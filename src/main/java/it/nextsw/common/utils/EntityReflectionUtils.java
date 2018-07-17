@@ -25,10 +25,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class EntityReflectionUtils {
 
-    @Value("${common.projection.package}")
+    @Value("${common.projection.package:}")
     private String projectionPackage;
 
-    @Value("${common.projection.generated.package}")
+    @Value("${common.projection.generated.package:}")
     private String generatedProjectionPackage;
 
     public Class<?> getProjectionClass(String projection) {

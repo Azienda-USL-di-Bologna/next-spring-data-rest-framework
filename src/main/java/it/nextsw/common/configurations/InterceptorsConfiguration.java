@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.util.StringUtils;
 
 /**
  *
@@ -37,19 +38,20 @@ public class InterceptorsConfiguration {
     public Map<String, List<RestControllerInterceptor>> interceptorsMap() throws ClassNotFoundException, IOException {
         Map<String, List<RestControllerInterceptor>> interceptorsMap = new HashMap();
 
-        Map<String, Object> interceptorBeansMap = beanFactory.getBeansWithAnnotation(it.nextsw.common.annotations.Interceptor.class);
-        Collection<Object> interceptorBeans = interceptorBeansMap.values();
-        for (Object interceptorBean: interceptorBeans) {
-            Interceptor annotation = interceptorBean.getClass().getAnnotation(Interceptor.class);
-            Class target = annotation.target();
-                List<RestControllerInterceptor> interceptors = interceptorsMap.get(target.getName());
-                if (interceptors == null) {
-                    interceptors = new ArrayList<>();
-                }
-                interceptors.add((RestControllerInterceptor) interceptorBean);
-                interceptorsMap.put(target.getName(), interceptors);
+            if (StringUtils.hasText(interceptorsPackage)) {
+            Map<String, Object> interceptorBeansMap = beanFactory.getBeansWithAnnotation(it.nextsw.common.annotations.Interceptor.class);
+            Collection<Object> interceptorBeans = interceptorBeansMap.values();
+            for (Object interceptorBean: interceptorBeans) {
+                Interceptor annotation = interceptorBean.getClass().getAnnotation(Interceptor.class);
+                Class target = annotation.target();
+                    List<RestControllerInterceptor> interceptors = interceptorsMap.get(target.getName());
+                    if (interceptors == null) {
+                        interceptors = new ArrayList<>();
+                    }
+                    interceptors.add((RestControllerInterceptor) interceptorBean);
+                    interceptorsMap.put(target.getName(), interceptors);
+            }
         }
-        
 //            ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
 //            scanner.addIncludeFilter(new AnnotationTypeFilter(Interceptor.class));
 //            for (BeanDefinition bd : scanner.findCandidateComponents(interceptorsPackage)) {
