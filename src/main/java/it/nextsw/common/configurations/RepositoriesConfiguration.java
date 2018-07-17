@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import org.springframework.util.StringUtils;
 
 /**
  *
@@ -45,7 +46,7 @@ public class RepositoriesConfiguration {
 //    @Autowired
 //    @RepositoryDescriptor(repositoryPath = "provvedimento")
 //    private ProvvedimentoRepository provvedimentoRepository;
-    @Value("${common.configuration.repository-package}")
+    @Value("${common.configuration.repository-package:}")
     private String repositoryPackage;
 
     private final String JAR_CLASS_PREFIX = "BOOT-INF.classes";
@@ -61,26 +62,27 @@ public class RepositoriesConfiguration {
     @Bean(name = "customRepositoryMap")
     public Map<String, CustomQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
         Map<String, CustomQueryDslRepository> repositories = new HashMap();
-
-        /**
-         * si cicla su tutte le classi repository; prima si cerca su tutto il
-         * classpath e poi si guarda se comprende il package repository
-         */
-        for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
-            if (info.getName().contains(repositoryPackage + ".")) {
-                Class<?> classz = null;
-                if (info.getName().startsWith(repositoryPackage + ".")) {
-//                    log.info("trovato repository: " + info.getName());
-                    classz = info.load();
-//                    log.info("loading class: " + info.getName());
-                } else if (info.getName().startsWith(JAR_CLASS_PREFIX + "." + repositoryPackage + ".")) {
-//                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
-                    classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
-                }
-                // si vede se ha la notazione del repository
-                RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
-                if (annotation != null) {
-                    repositories.put(annotation.path(), (CustomQueryDslRepository) repositoryMap.get(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, classz.getSimpleName())));
+        if (StringUtils.hasText(repositoryPackage)) {
+            /**
+             * si cicla su tutte le classi repository; prima si cerca su tutto il
+             * classpath e poi si guarda se comprende il package repository
+             */
+            for (final ClassPath.ClassInfo info : ClassPath.from(ClassLoader.getSystemClassLoader()).getTopLevelClasses()) {
+                if (info.getName().contains(repositoryPackage + ".")) {
+                    Class<?> classz = null;
+                    if (info.getName().startsWith(repositoryPackage + ".")) {
+    //                    log.info("trovato repository: " + info.getName());
+                        classz = info.load();
+    //                    log.info("loading class: " + info.getName());
+                    } else if (info.getName().startsWith(JAR_CLASS_PREFIX + "." + repositoryPackage + ".")) {
+    //                    log.info("loading class: " + info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
+                        classz = Class.forName(info.getName().substring(JAR_CLASS_PREFIX.length() + 1));
+                    }
+                    // si vede se ha la notazione del repository
+                    RepositoryRestResource annotation = classz.getAnnotation(RepositoryRestResource.class);
+                    if (annotation != null) {
+                        repositories.put(annotation.path(), (CustomQueryDslRepository) repositoryMap.get(CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, classz.getSimpleName())));
+                    }
                 }
             }
         }
