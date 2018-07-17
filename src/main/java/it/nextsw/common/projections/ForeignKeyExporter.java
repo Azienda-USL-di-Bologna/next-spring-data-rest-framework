@@ -54,7 +54,8 @@ public class ForeignKeyExporter {
         String targetEntityName = null;
         String url = null;
 
-        Field field = SourceEntity.getClass().getDeclaredField(fieldName);
+        Field field = entityReflectionUtils.getEntityFromProxyObject(SourceEntity).getDeclaredField(fieldName);
+//        Field field = SourceEntity.getClass().getDeclaredField(fieldName);
         if (field.getType().isAssignableFrom(Set.class) || field.getType().isAssignableFrom(List.class)) {
 //            OneToMany annotation = field.getAnnotationsByType(OneToMany.class)[0];
 //            String filterFieldName = annotation.mappedBy();
