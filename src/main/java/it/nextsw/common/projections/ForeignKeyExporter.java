@@ -68,7 +68,7 @@ public class ForeignKeyExporter {
 
             String fieldTypeName = field.getGenericType().getTypeName();
 
-            System.out.println("class: " + fieldTypeName);
+//            System.out.println("class: " + fieldTypeName);
             // prendiamo la classe racchiusa tra '<>'
             String regex = "<([^<]+)>";
             Pattern pattern = Pattern.compile(regex);
@@ -81,7 +81,7 @@ public class ForeignKeyExporter {
                  * il nuovo URL deve avere idAzienda.id=5, quindi generare il
                  * link
                  */
-                String filterFieldName = getFilterFieldName(field, targetEntityClass);
+                String filterFieldName = entityReflectionUtils.getFilterFieldName(field, targetEntityClass);
 
                 Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
                 Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
@@ -113,40 +113,5 @@ public class ForeignKeyExporter {
 
         ForeignKey fk = new ForeignKey(id, targetEntityName, url);
         return fk;
-    }
-
-    private String getFilterFieldName(Field field, Class targetEntityClass) {
-        String filterFieldName = null;
-
-        // se l'annotazione è OneToMany allora il filterFieldName si ottiene dal mappedBy
-        OneToMany oneToManyAnnotation = field.getAnnotationsByType(OneToMany.class)[0];
-        if (oneToManyAnnotation != null) {
-            filterFieldName = oneToManyAnnotation.mappedBy();
-        } else {
-            // se l'annotazione è ManyToMany ci sono 2 casi, se c'è il mappedBy, allora il filterFieldName si ottiene da esso
-            ManyToMany manyToManyAnnotation = field.getAnnotationsByType(ManyToMany.class)[0];
-            if (manyToManyAnnotation != null) {
-                if (manyToManyAnnotation.mappedBy() != null && !manyToManyAnnotation.mappedBy().isEmpty()) {
-                    filterFieldName = manyToManyAnnotation.mappedBy();
-                } /**
-                 * altrimenti devo andare a cercare nell'entità a cui punta la
-                 * Foreign Key il campo che ha l'annotazione ManyToMany con
-                 * mappedBy = al nome del campo dell'entità Source. una volta
-                 * trovato il filterFieldName sarà il nome del campo
-                 *
-                 */
-                else {
-                    Field[] TargetClassFields = targetEntityClass.getDeclaredFields();
-                    for (Field targetField : TargetClassFields) {
-                        ManyToMany annotation = targetField.getAnnotationsByType(ManyToMany.class)[0];
-                        if (annotation.mappedBy().equals(field.getName())) {
-                            filterFieldName = targetField.getName();
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        return filterFieldName;
     }
 }

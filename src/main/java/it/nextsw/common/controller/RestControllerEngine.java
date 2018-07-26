@@ -14,6 +14,7 @@ import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
+import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
 import it.nextsw.common.repositories.CustomQueryDslRepository;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -70,6 +71,9 @@ public abstract class RestControllerEngine {
 
     @PersistenceContext
     protected EntityManager em;
+    
+    @Autowired
+    ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
 
     /**
      * mappa dei repository
@@ -402,6 +406,12 @@ public abstract class RestControllerEngine {
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
+        // setto gli additionalData e la request sulla classe che gestisce gli i interceptor delle projection
+        projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
+        
+        // svuoto la cache delle entity sulle projections
+        projectionsInterceptorLauncher.resetEntityMapCache();
+        
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, request);
