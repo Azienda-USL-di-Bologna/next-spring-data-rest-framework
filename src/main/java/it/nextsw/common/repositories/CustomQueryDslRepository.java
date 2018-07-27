@@ -8,6 +8,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DatePath;
 import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import java.time.LocalDate;
@@ -99,6 +100,31 @@ public interface CustomQueryDslRepository<E extends Object, ID extends Object, T
                     } catch (InvalidFilterException ex) {
                         return Optional.of(Expressions.asBoolean(true).isTrue());
                     }
+                });
+        
+        bindings.bind(Integer.class).all(
+                (Path<Integer> path, Collection<? extends Integer> values) -> {
+                    final List<? extends Integer> numbers = new ArrayList<>(values);
+                    Predicate res = null;
+                    if (values.isEmpty()) {
+                            res = Expressions.asBoolean(true).isTrue();
+                    } else if (values.size() == 1) {
+                        if (numbers.get(0) == 999999999){
+                                NumberPath integerPath = (NumberPath) path;
+                                res = integerPath.isNull();
+                        } else {
+                            NumberPath integerPath = (NumberPath) path;
+                            res = integerPath.eq(numbers.get(0));
+                        }
+                    } else {
+                        BooleanBuilder b = new BooleanBuilder();
+                        for (Integer value : values) {
+                            NumberPath integerPath = (NumberPath) path;
+                            b = b.or(integerPath.eq(value));
+                        }
+                        res = b;
+                    }
+                    return Optional.of(res);
                 });
 
     }
