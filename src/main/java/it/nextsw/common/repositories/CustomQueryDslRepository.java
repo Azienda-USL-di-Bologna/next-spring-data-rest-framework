@@ -119,6 +119,8 @@ public interface CustomQueryDslRepository<E extends Object, ID extends Object, T
                     if (values.isEmpty()) {
                             res = Expressions.asBoolean(true).isTrue();
                     } else if (values.size() == 1) {
+                        // stratagemma per riuscire a filtrare per null. 
+                        // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null
                         if (numbers.get(0) == 999999999){
                                 NumberPath integerPath = (NumberPath) path;
                                 res = integerPath.isNull();
