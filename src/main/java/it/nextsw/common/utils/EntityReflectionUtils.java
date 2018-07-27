@@ -103,9 +103,9 @@ public class EntityReflectionUtils {
         }
         return annotation != null;
     }
-    
+
     public boolean isEntityClass(Class classz) {
-        java.lang.annotation.Annotation annotation = classz.getAnnotation(javax.persistence.Entity.class);;
+        java.lang.annotation.Annotation annotation = classz.getAnnotation(javax.persistence.Entity.class);
         return annotation != null;
     }
 
@@ -115,22 +115,25 @@ public class EntityReflectionUtils {
      * classe Entity
      *
      * @param proxyEntity
-     * @return la classe entity vero e proprio a partire dalle classi proxy generate da Spring
+     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
     public Class getEntityFromProxyObject(Object proxyEntity) throws EntityReflectionException {
         return getEntityFromProxyClass(proxyEntity.getClass());
     }
-        /**
+
+    /**
      * Torna la classe Entity vera e propria a partire dalle classi proxy
      * generati da Spring. Chiama la getSuperClass fino a che non ottiene la
      * classe Entity
      *
      * @param proxyEntityClass
-     * @return la classe entity vero e proprio a partire dalle classi proxy generate da Spring
+     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
-    
+
     public Class getEntityFromProxyClass(Class<?> proxyEntityClass) throws EntityReflectionException {
         Class<?> classz = proxyEntityClass;
         do {
@@ -141,7 +144,6 @@ public class EntityReflectionUtils {
         } while (!classz.isAssignableFrom(Object.class));
         throw new EntityReflectionException("l'oggetto passato non deriva da un'Entity");
     }
-    
 
     public Class getDefaultProjection(Object repository) throws EntityReflectionException {
         Class classz = repository.getClass();

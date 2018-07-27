@@ -14,8 +14,10 @@ public interface RestControllerInterceptor {
 
     public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request);
 
+    // lista di risultati estratti da modificare
     public List<Object> afterSelectQueryInterceptor(List<Object> entities, Map<String, String> additionalData, HttpServletRequest request);
 
+    // elemento da modificare di ritorno dalla query 
     public Object afterSelectQueryInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request);
 
     public Object beforeCreateInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException;

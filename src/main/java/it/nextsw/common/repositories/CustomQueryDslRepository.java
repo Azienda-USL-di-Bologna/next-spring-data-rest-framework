@@ -25,6 +25,7 @@ import org.springframework.data.querydsl.binding.QuerydslBinderCustomizer;
 import org.springframework.data.querydsl.binding.QuerydslBindings;
 
 /**
+ * QuerydslBinderCustomizer: customizza i filtri
  *
  * @author gdm
  * @param <E>
@@ -35,6 +36,15 @@ public interface CustomQueryDslRepository<E extends Object, ID extends Object, T
         extends QuerydslBinderCustomizer<T>,
         QuerydslPredicateExecutor<E> {
 
+    /**
+     * per generare il Q per fare i filtri, si istanzia un oggetto del campo di
+     * ricerca. Implemetando il metodo customize ci si gestisce i filtri come si
+     * vuole.
+     *
+     *
+     * @param bindings
+     * @param entityPath
+     */
     @Override
     default void customize(QuerydslBindings bindings, T entityPath) {
 
@@ -132,6 +142,11 @@ public interface CustomQueryDslRepository<E extends Object, ID extends Object, T
     default StringOperation getStringOperation(String valueToParse) throws InvalidFilterException {
         StringOperation res;
 
+        /**
+         * esempio: nome=$equalsIgnorecase(NOME). I valori di filtro permessi
+         * sono: contains, containsIgnoreCase, startsWith, startsWithIgnoreCase,
+         * equals, equalsIgnoreCase
+         */
         String regex = "\\$(.*?)\\((.*)\\)";
         Pattern r = Pattern.compile(regex);
         Matcher m = r.matcher(valueToParse);

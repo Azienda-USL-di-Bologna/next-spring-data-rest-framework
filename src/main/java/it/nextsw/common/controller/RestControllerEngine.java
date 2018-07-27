@@ -193,7 +193,7 @@ public abstract class RestControllerEngine {
                  * alla fk, cioè quello il cui nome è ottenuto togliendo il
                  * prefisso "fk_"
                  */
-                String fieldName = key.substring("fk_".length());                
+                String fieldName = key.substring("fk_".length());
                 Field fkField = entityReflectionUtils.getEntityFromProxyObject(fieldValue).getDeclaredField(fieldName);
 
                 /**
@@ -225,21 +225,19 @@ public abstract class RestControllerEngine {
                 if (fieldChildValue != null && entityReflectionUtils.isEntityClassFromProxyObject(fieldChildValue.getClass())) {
                     if (!insert) {
                         Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildValue.getClass());
-                        Object id = ((Map<String, Object>)dataChildValue).get(primaryKeyField.getName());
+                        Object id = ((Map<String, Object>) dataChildValue).get(primaryKeyField.getName());
                         if (id != null) {
                             System.out.println("trovato id: " + id);
                             fieldChildValue = merge((Map<String, Object>) dataChildValue, fieldChildValue, request, additionalDataMap);
                             fieldChildValue = restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildValue, request, additionalDataMap);
-                        }
-                        else {
+                        } else {
                             Method setMethod = getSetMethod(fieldValue.getClass(), key);
                             Class<?> type = entityReflectionUtils.getEntityFromProxyObject(fieldChildValue);
                             Object value = objectMapper.convertValue(dataChildValue, type);
                             fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
                             setMethod.invoke(fieldValue, value);
                         }
-                    }
-                    else {
+                    } else {
                         // togliamo l'eventuale id(passato), chiamando il metodo setId con null
                         Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(fieldChildValue);
                         System.out.println(String.format("sto invocando %s.%s(%s)", fieldChildValue.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
@@ -344,8 +342,7 @@ public abstract class RestControllerEngine {
                             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                                 throw new RestControllerEngineException(String.format("errore nell'eliminazione del campo id della fk %s", key), ex);
                             }
-                        }
-                        else {
+                        } else {
                             setMethod.invoke(entity, value);
                         }
                     }
@@ -399,6 +396,10 @@ public abstract class RestControllerEngine {
     protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException {
         Object resource = null;
         Class projectionClass;
+        /**
+         * trasforma gli additionalData espressi in stringa in una mappa vera
+         * attraverso un metodo di Google
+         */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
         try {

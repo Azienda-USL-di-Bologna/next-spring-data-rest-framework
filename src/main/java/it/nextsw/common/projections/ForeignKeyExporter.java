@@ -54,8 +54,13 @@ public class ForeignKeyExporter {
         String targetEntityName = null;
         String url = null;
 
+        // esempio idAzienda
         Field field = entityReflectionUtils.getEntityFromProxyObject(SourceEntity).getDeclaredField(fieldName);
 //        Field field = SourceEntity.getClass().getDeclaredField(fieldName);
+
+        /**
+         * può essere un Set o una Lista o un 'Entità. esempio Set<Pec>
+         */
         if (field.getType().isAssignableFrom(Set.class) || field.getType().isAssignableFrom(List.class)) {
 //            OneToMany annotation = field.getAnnotationsByType(OneToMany.class)[0];
 //            String filterFieldName = annotation.mappedBy();
@@ -64,12 +69,18 @@ public class ForeignKeyExporter {
             String fieldTypeName = field.getGenericType().getTypeName();
 
             System.out.println("class: " + fieldTypeName);
+            // prendiamo la classe racchiusa tra '<>'
             String regex = "<([^<]+)>";
             Pattern pattern = Pattern.compile(regex);
             Matcher matcher = pattern.matcher(fieldTypeName);
             if (matcher.find()) {
                 String targetEntityFullName = matcher.group(1);
+                // qui ho la classe di Pec (se si considera l'esempio con le Pec)
                 Class<?> targetEntityClass = Class.forName(targetEntityFullName);
+                /**
+                 * il nuovo URL deve avere idAzienda.id=5, quindi generare il
+                 * link
+                 */
                 String filterFieldName = getFilterFieldName(field, targetEntityClass);
 
                 Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
@@ -82,13 +93,18 @@ public class ForeignKeyExporter {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");
             }
         } else {
+            // getFkMethod esempio è getIdAzienda
             Method getFkMethod = SourceEntity.getClass().getMethod("get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
             Object fkEntity = getFkMethod.invoke(SourceEntity);
+            // prende il tipo di ritorno del metodo, sarebbe Azienda
             Class entityClass = getFkMethod.getReturnType();
 //            Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(fkEntity);
+            // dal tipo di ritorno si va a prendere la getPrimaryKey
             Method fkPrimaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(entityClass);
 
+            // qui nell'esempio con l'azienda sarà Azienda
             targetEntityName = entityClass.getSimpleName().toLowerCase();
+            // se ha un valore l'oggetto, allora si va a calcolare l'id, invocando getId() su azienda
             if (fkEntity != null) {
                 id = fkPrimaryKeyGetMethod.invoke(fkEntity);
                 url = String.format("%s/%s", buildBaseUrl(targetEntityName), id);
