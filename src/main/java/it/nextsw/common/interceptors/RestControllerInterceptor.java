@@ -2,7 +2,7 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 
@@ -12,10 +12,13 @@ import javax.servlet.http.HttpServletRequest;
  */
 public interface RestControllerInterceptor {
 
+    public final String BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "beforeSelectQueryInterceptor";
+    public final String AFTER_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "afterSelectQueryInterceptor";
+    
     public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request);
 
     // lista di risultati estratti da modificare
-    public List<Object> afterSelectQueryInterceptor(List<Object> entities, Map<String, String> additionalData, HttpServletRequest request);
+    public Collection<Object> afterSelectQueryInterceptor(Collection<Object> entities, Map<String, String> additionalData, HttpServletRequest request);
 
     // elemento da modificare di ritorno dalla query 
     public Object afterSelectQueryInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request);

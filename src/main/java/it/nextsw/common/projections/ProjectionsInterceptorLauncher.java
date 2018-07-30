@@ -13,15 +13,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -50,9 +48,6 @@ public class ProjectionsInterceptorLauncher {
 
     @Autowired
     protected ProjectionFactory factory;
-
-    @PersistenceContext
-    private EntityManager em;
 
     private Map<String, String> additionalData;
     private HttpServletRequest request;
@@ -100,32 +95,47 @@ public class ProjectionsInterceptorLauncher {
          * Il metodo get() è il sostituto dell'operatore '.'
          * Di fatto sto costruendo la query "QEntità.entità.getId.eq(id)"
          */
-        BooleanExpression eq = new PathBuilder(
+        Predicate pred = new PathBuilder(
                 BooleanExpression.class, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, entityFromProxyClass.getSimpleName())).
                 get(entityReflectionUtils.getPrimaryKeyField((Class) entityFromProxyClass).getName()).eq(id);
 
         // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco CustomQueryDslRepository perché tutti i repositories la estendono.
         CustomQueryDslRepository repo = customRepositoryMap.get(entityFromProxyClass.getSimpleName().toLowerCase());
 
-        // Chiamo l'interceptor del before select il quale mi restitusce il predicato, eventualmente modificato, che userò per fare la query.
-        Predicate pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(eq, entityFromProxyClass, request, additionalData);
+        // controllo se è stato implementato un interceptor before select
+        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityFromProxyClass);
+        if (implementedBeforeQueryInterceptor) {
+            // se è implementato l'interceptor del before select il quale mi restitusce il predicato, eventualmente modificato, che userò per fare la query.
+            pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, entityFromProxyClass, request, additionalData);
+        }
 
         /* L'uso della entityMap serve a cacheare il risultato della query rispetto ad un definito predicato.
          * Quindi a ugual predicato corrisponderà lo stesso risultato senza bisogno di eseguire due volte la stessa query.
          */
         Object entity = entityMap.get(pred.toString());
         if (entity == null) {
-            Optional<Object> entityOp = repo.findOne(pred); // Esecuzione della query
-            if (entityOp.isPresent()) { // Se la query trova un risultato
-                entity = entityOp.get();
-                entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, returnType, request, additionalData);   // Eseguo l'interceptor after select
+            // se è stato implementato un interceptor before select eseguo la query con il predicato calcolato prima
+            if (implementedBeforeQueryInterceptor) {
+                Optional<Object> entityOp = repo.findOne(pred); // Esecuzione della query
+                if (entityOp.isPresent()) { // Se la query trova un risultato
+                    entity = entityOp.get();
+                }
+                else
+                    entity = null;
+            }
+            else { // altrimenti mi riconduco al caso base tornando direttamente l'oggetto ottenuto chiamando il metodo sull'entità (che teoricamente è più veloce)
+                entity = invoke;
+            }
+            entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, returnType, request, additionalData);   // Eseguo l'interceptor after select
+            if (entity != null) {
                 Class<?> projectionClass = entityReflectionUtils.getProjectionClass(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata 
                 entity = factory.createProjection(projectionClass, entity); // Applico la projection con i campi base al risultato
                 entityMap.put(pred.toString(), entity);
-            } else {
+            }
+            else {
                 // Nel caso la query non torni nulla nella mappa salvo la strina "null". In questo modo evito di rifare la query anche in questi casi
                 entityMap.put(pred.toString(), "null");
-                entity = null;
+//                entity = null;
             }
         } else if (entity.getClass().isAssignableFrom(String.class) && entity.toString().equals("null")) {
             entity = null;
@@ -178,19 +188,34 @@ public class ProjectionsInterceptorLauncher {
                 get(filterFieldName).
                 get(primaryKeyField.getName()).eq(id);
         
-        // Modifico eventualmente il predicato tramite l'interceptor before select 
-        pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, returnType, request, additionalData);
+        // controllo se è stato implementato un interceptor before select
+        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityReflectionUtils.getEntityFromProxyClass(returnType));        
+
+        // se lo è lo eseguo per modificare il predicato
+        if (implementedBeforeQueryInterceptor) {
+            pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, returnType, request, additionalData);
+        }
         
+        // vedo se ho già l'entità nella mappa cache
         Set entities = (Set) entityMap.get(pred.toString());
         if (entities == null) {
-            List entitiesFound = (List) repo.findAll(pred); // Eseguo la query
+            Collection entitiesFound;
+//            List<RestControllerInterceptor> interceptorsFound = restControllerInterceptor.getInterceptors(entityReflectionUtils.getEntityFromProxyClass(returnType));
+            // se  go il predicato before selet implementato allora eseguo la query con il predicato calcolato prima
+            if (implementedBeforeQueryInterceptor) {
+//                System.out.println("query!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                entitiesFound = (Collection) repo.findAll(pred); // Eseguo la query
+            }
+            else { // altrimenti mi riconduco al caso base eseguendo direttamente il metodo sull'entità (che teoricamente è più veloce)
+//                System.out.println("NNO query!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                entitiesFound = (Collection) targetEntityClass.getMethod(methodName).invoke(target);
+            }
+            
             // Eseguo l'interceptor after select.
-            entitiesFound = (List) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, request, additionalData);
-//            entities = (Set) targetEntityClass.getMethod(methodName).invoke(target);
+            entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, request, additionalData);
             Class<?> projectionClass = entityReflectionUtils.getProjectionClass(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
             entities = (Set) StreamSupport.stream(entitiesFound.spliterator(), false)
                     .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
-
             entityMap.put(pred.toString(), entities);
         }
 
