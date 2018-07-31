@@ -14,6 +14,7 @@ import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
+import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
 import it.nextsw.common.repositories.CustomQueryDslRepository;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -73,6 +74,9 @@ public abstract class RestControllerEngine {
 
     @PersistenceContext
     protected EntityManager em;
+    
+    @Autowired
+    ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
 
     /**
      * mappa dei repository
@@ -160,6 +164,8 @@ public abstract class RestControllerEngine {
             // inserimento dell'entità
             generalRepository.save(entity);
             // viene ritornata l'entità inserita con tutti i campi, compreso l'id generato
+            Class projectionClass = getProjectionClass(null, request);
+            entity = factory.createProjection(projectionClass, entity);
             return entity;
         } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchFieldException | SecurityException | ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
@@ -301,6 +307,9 @@ public abstract class RestControllerEngine {
             restControllerInterceptor.executebeforeUpdateInterceptor(entity, request, additionalDataMap);
 
             generalRepository.save(res);
+            Class projectionClass = getProjectionClass(null, request);
+            res = factory.createProjection(projectionClass, res);
+            
             return res;
         } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'update", ex);
@@ -409,6 +418,12 @@ public abstract class RestControllerEngine {
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
+        // setto gli additionalData e la request sulla classe che gestisce gli i interceptor delle projection
+        projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
+        
+        // svuoto la cache delle entity sulle projections
+        projectionsInterceptorLauncher.resetEntityMapCache();
+        
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, request);
