@@ -161,6 +161,8 @@ public abstract class RestControllerEngine {
             // inserimento dell'entità
             generalRepository.save(entity);
             // viene ritornata l'entità inserita con tutti i campi, compreso l'id generato
+            Class projectionClass = getProjectionClass(null, request);
+            entity = factory.createProjection(projectionClass, entity);
             return entity;
         } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchFieldException | SecurityException | ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
@@ -302,6 +304,9 @@ public abstract class RestControllerEngine {
             restControllerInterceptor.executebeforeUpdateInterceptor(entity, request, additionalDataMap);
 
             generalRepository.save(res);
+            Class projectionClass = getProjectionClass(null, request);
+            res = factory.createProjection(projectionClass, res);
+            
             return res;
         } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'update", ex);
