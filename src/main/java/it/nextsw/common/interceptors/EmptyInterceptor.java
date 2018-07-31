@@ -2,7 +2,7 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 
@@ -18,7 +18,7 @@ public abstract class EmptyInterceptor implements RestControllerInterceptor {
     }
 
     @Override
-    public List<Object> afterSelectQueryInterceptor(List<Object> entities, Map<String, String> additionalData, HttpServletRequest request) {
+    public Collection<Object> afterSelectQueryInterceptor(Collection<Object> entities, Map<String, String> additionalData, HttpServletRequest request) {
         return entities;
     }
 
