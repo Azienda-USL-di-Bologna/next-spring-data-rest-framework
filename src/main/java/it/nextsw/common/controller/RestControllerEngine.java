@@ -15,6 +15,7 @@ import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
 import it.nextsw.common.repositories.CustomQueryDslRepository;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -22,6 +23,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -327,6 +330,10 @@ public abstract class RestControllerEngine {
 
 //                        Date date = Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
                         value = dateTime;
+                        setMethod.invoke(entity, value);
+                    } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                        // caso in cui il campo che si sta aggiornando è un Array (questo non è un caso standard e va trattato a parte, come le date)
+                        value = ((List) value).toArray((Object[]) Array.newInstance(setMethod.getParameterTypes()[0].getComponentType(), 0));
                         setMethod.invoke(entity, value);
                     } else {
                         Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
