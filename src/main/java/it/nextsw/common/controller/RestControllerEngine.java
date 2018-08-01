@@ -74,7 +74,7 @@ public abstract class RestControllerEngine {
 
     @PersistenceContext
     protected EntityManager em;
-    
+
     @Autowired
     ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
 
@@ -309,7 +309,7 @@ public abstract class RestControllerEngine {
             generalRepository.save(res);
             Class projectionClass = getProjectionClass(null, request);
             res = factory.createProjection(projectionClass, res);
-            
+
             return res;
         } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nell'update", ex);
@@ -341,7 +341,11 @@ public abstract class RestControllerEngine {
                         value = dateTime;
                         setMethod.invoke(entity, value);
                     } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
-                        // caso in cui il campo che si sta aggiornando è un Array (questo non è un caso standard e va trattato a parte, come le date)
+                        /**
+                         * caso in cui il campo che si sta aggiornando è un
+                         * Array (questo non è un caso standard e va trattato a
+                         * parte, come le date)
+                         */
                         value = ((List) value).toArray((Object[]) Array.newInstance(setMethod.getParameterTypes()[0].getComponentType(), 0));
                         setMethod.invoke(entity, value);
                     } else {
@@ -420,10 +424,10 @@ public abstract class RestControllerEngine {
 
         // setto gli additionalData e la request sulla classe che gestisce gli i interceptor delle projection
         projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
-        
+
         // svuoto la cache delle entity sulle projections
         projectionsInterceptorLauncher.resetEntityMapCache();
-        
+
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, request);
