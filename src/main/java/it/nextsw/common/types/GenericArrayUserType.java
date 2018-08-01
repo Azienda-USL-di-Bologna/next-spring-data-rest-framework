@@ -7,12 +7,17 @@ import org.hibernate.usertype.UserType;
 import java.io.Serializable;
 import java.sql.*;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.hibernate.usertype.ParameterizedType;
 
+/**
+ * classe generica da utilizzare per tipizzate i campi array su entity
+ *
+ * @author gdm e spritz
+ * @param <T>
+ */
 public class GenericArrayUserType<T extends Serializable> implements UserType, ParameterizedType {
 
+    // tipi di array attualmente supportati
     public static final String INTEGER_ELEMENT_TYPE = "integer";
     public static final String TEXT_ELEMENT_TYPE = "text";
 
@@ -38,7 +43,6 @@ public class GenericArrayUserType<T extends Serializable> implements UserType, P
 
     @Override
     public boolean equals(Object x, Object y) throws HibernateException {
-
         if (x == null) {
             return y == null;
         }
@@ -55,9 +59,6 @@ public class GenericArrayUserType<T extends Serializable> implements UserType, P
         if (resultSet.wasNull()) {
             return null;
         }
-        //@SuppressWarnings("unchecked")
-//        Object object = new Object();
-//        T foo;
 
         if (resultSet.getArray(names[0]) == null) {
             Object res = null;
@@ -75,7 +76,6 @@ public class GenericArrayUserType<T extends Serializable> implements UserType, P
         Array array = resultSet.getArray(names[0]);
         @SuppressWarnings("unchecked")
         T javaArray = (T) array.getArray();
-//        List<T> asList = Arrays.asList(javaArray);
         return javaArray;
     }
 
@@ -88,8 +88,18 @@ public class GenericArrayUserType<T extends Serializable> implements UserType, P
             @SuppressWarnings("unchecked")
             T castObject = (T) value;
             Array array = null;
+            /**
+             * crea un array del tipo passato come parametro nell'annotazione
+             * sull'entity. Ad esempio se nel campo dell'entity si ha:
+             *
+             * @Type(type = "array", parameters = @Parameter(name =
+             * "elements-type", value = GenericArrayUserType.TEXT_ELEMENT_TYPE))
+             * allora verrà creato un text[] e popolato con i valori presenti in
+             * castObject
+             */
             array = connection.createArrayOf(parameters.getProperty("elements-type"), (Object[]) castObject);
 
+            // inserimento nello statement l'array da inserire
             statement.setArray(index, array);
         }
     }

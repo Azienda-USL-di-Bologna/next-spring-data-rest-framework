@@ -344,12 +344,12 @@ public abstract class RestControllerEngine {
                         /**
                          * caso in cui il campo che si sta aggiornando è un
                          * Array (questo non è un caso standard e va trattato a
-                         * parte, come le date)
+                         * parte, come le date).
                          *
-                         * viene creato un array che contiere oggetti del tipo
+                         * Viene creato un array che contiere oggetti del tipo
                          * identificato dal campo nell'entity; una volta creato
                          * l'array viene popolato con i valori passati nella
-                         * richiesta
+                         * richiesta.
                          */
                         value = ((List) value).toArray((Object[]) Array.newInstance(setMethod.getParameterTypes()[0].getComponentType(), 0));
                         /**
