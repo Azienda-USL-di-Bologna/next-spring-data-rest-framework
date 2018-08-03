@@ -431,11 +431,11 @@ public abstract class RestControllerEngine {
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
-        // setto gli additionalData e la request sulla classe che gestisce gli i interceptor delle projection
+        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entity sulle projections
         projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
 
         // svuoto la cache delle entity sulle projections
-        projectionsInterceptorLauncher.resetEntityMapCache();
+//        projectionsInterceptorLauncher.resetEntityMapCache();
 
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
