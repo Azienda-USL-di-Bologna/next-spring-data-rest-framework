@@ -1,6 +1,7 @@
 package it.nextsw.common.utils;
 
 import com.google.common.base.CaseFormat;
+import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
@@ -145,26 +146,63 @@ public class EntityReflectionUtils {
         throw new EntityReflectionException("l'oggetto passato non deriva da un'Entity");
     }
 
+    /**
+     *
+     * @param repository
+     * @return
+     * @throws EntityReflectionException
+     */
     public Class getDefaultProjection(Object repository) throws EntityReflectionException {
         Class classz = repository.getClass();
-        AnnotatedType[] annotatedInterfaces = classz.getAnnotatedInterfaces();
-        for (AnnotatedType annotatedType : annotatedInterfaces) {
-            try {
-                classz = Class.forName(annotatedType.getType().getTypeName());
-            } catch (ClassNotFoundException ex) {
-                throw new EntityReflectionException("l'oggetto passato non è un repository o non ha l'annotazione RepositoryRestResource");
-            }
-            do {
-                Annotation annotation = classz.getAnnotation(RepositoryRestResource.class);
-                if (annotation != null) {
-                    RepositoryRestResource repositoryRestResourceAnnotation = (RepositoryRestResource) annotation;
-                    return repositoryRestResourceAnnotation.excerptProjection();
-                } else {
-                    classz = classz.getSuperclass();
-                }
-            } while (!classz.isAssignableFrom(Object.class));
+        NextSdrRepository nextSdrRepository = null;
+        try {
+            nextSdrRepository = (NextSdrRepository) EntityReflectionUtils.getFirstAnnotationOverHierarchy(classz, NextSdrRepository.class);
+        } catch (ClassNotFoundException e) {
+            throw new EntityReflectionException(e);
         }
-        throw new EntityReflectionException("l'oggetto passato non è un repository o non ha l'annotazione RepositoryRestResource");
+        return nextSdrRepository.defaultProjection();
+
+
+//        AnnotatedType[] annotatedInterfaces = classz.getAnnotatedInterfaces();
+//        for (AnnotatedType annotatedType : annotatedInterfaces) {
+//            try {
+//                classz = Class.forName(annotatedType.getType().getTypeName());
+//            } catch (ClassNotFoundException ex) {
+//                throw new EntityReflectionException("l'oggetto passato non è un repository o non ha l'annotazione RepositoryRestResource");
+//            }
+//            do {
+//                Annotation annotation = classz.getAnnotation(RepositoryRestResource.class);
+//                if (annotation != null) {
+//                    RepositoryRestResource repositoryRestResourceAnnotation = (RepositoryRestResource) annotation;
+//                    return repositoryRestResourceAnnotation.excerptProjection();
+//                } else {
+//                    classz = classz.getSuperclass();
+//                }
+//            } while (!classz.isAssignableFrom(Object.class));
+//        }
+//        throw new EntityReflectionException("l'oggetto passato non è un repository o non ha l'annotazione RepositoryRestResource");
+    }
+
+    /**
+     *
+     * @param objectClass
+     * @param annotationClass
+     * @return
+     */
+    public static Annotation getFirstAnnotationOverHierarchy(Class objectClass, Class annotationClass) throws ClassNotFoundException {
+        AnnotatedType[] annotatedInterfaces = objectClass.getAnnotatedInterfaces();
+        for (AnnotatedType annotatedType : annotatedInterfaces) {
+                objectClass = Class.forName(annotatedType.getType().getTypeName());
+            do {
+                Annotation annotation = objectClass.getAnnotation(annotationClass);
+                if (annotation != null) {
+                    return annotation;
+                } else {
+                    objectClass = objectClass.getSuperclass();
+                }
+            } while (!objectClass.isAssignableFrom(Object.class));
+        }
+        return null;
     }
     
     public String getFilterFieldName(Field field, Class targetEntityClass) {

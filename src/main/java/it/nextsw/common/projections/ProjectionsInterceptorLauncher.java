@@ -6,7 +6,7 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.PathBuilder;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
-import it.nextsw.common.repositories.CustomQueryDslRepository;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import java.lang.reflect.Field;
@@ -38,7 +38,7 @@ public class ProjectionsInterceptorLauncher {
      */
     @Autowired
     @Qualifier(value = "customRepositoryMap")
-    protected Map<String, CustomQueryDslRepository> customRepositoryMap;
+    protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
 
     @Autowired
     private RestControllerInterceptorEngine restControllerInterceptor;
@@ -108,8 +108,8 @@ public class ProjectionsInterceptorLauncher {
                 BooleanExpression.class, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, entityFromProxyClass.getSimpleName())).
                 get(entityReflectionUtils.getPrimaryKeyField((Class) entityFromProxyClass).getName()).eq(id);
 
-        // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco CustomQueryDslRepository perché tutti i repositories la estendono.
-        CustomQueryDslRepository repo = customRepositoryMap.get(entityFromProxyClass.getSimpleName().toLowerCase());
+        // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco NextSdrQueryDslRepository perché tutti i repositories la estendono.
+        NextSdrQueryDslRepository repo = customRepositoryMap.get(entityFromProxyClass.getSimpleName().toLowerCase());
 
         // controllo se è stato implementato un interceptor before select
 //        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityFromProxyClass);
@@ -182,7 +182,7 @@ public class ProjectionsInterceptorLauncher {
         Class returnType = (Class) ((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0];
         String returnTypeEntityName = returnType.getSimpleName();
 
-        CustomQueryDslRepository repo = customRepositoryMap.get(returnTypeEntityName.toLowerCase());
+        NextSdrQueryDslRepository repo = customRepositoryMap.get(returnTypeEntityName.toLowerCase());
         
         String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, methodName.substring(3)); // Dal nome del metodo ricavo il nome del campo che sto espdandendo es. UtenteStrutturaSet
 
@@ -212,7 +212,7 @@ public class ProjectionsInterceptorLauncher {
         Set entities = (Set) threadLocalParams.get().entityMap.get(pred.toString());
         if (entities == null) {
             Collection entitiesFound;
-//            List<RestControllerInterceptor> interceptorsFound = restControllerInterceptor.getInterceptors(entityReflectionUtils.getEntityFromProxyClass(returnType));
+//            List<NextSdrControllerInterceptor> interceptorsFound = restControllerInterceptor.getInterceptors(entityReflectionUtils.getEntityFromProxyClass(returnType));
             // se  go il predicato before selet implementato allora eseguo la query con il predicato calcolato prima
             if (implementedBeforeQueryInterceptor) {
 //                System.out.println("query!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");

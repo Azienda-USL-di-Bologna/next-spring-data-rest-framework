@@ -7,10 +7,11 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 
 /**
+ * Un {@link NextSdrControllerInterceptor} con alcuni metodi implementati di default
  *
  * @author gdm
  */
-public abstract class EmptyInterceptor implements RestControllerInterceptor {
+public abstract class NextSdrEmptyControllerInterceptor implements NextSdrControllerInterceptor {
 
     @Override
     public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request) {
@@ -28,16 +29,16 @@ public abstract class EmptyInterceptor implements RestControllerInterceptor {
     }
 
     @Override
-    public Object beforeCreateInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
+    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
         return entity;
     }
 
     @Override
-    public Object beforeUpdateInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
+    public Object beforeUpdateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
         return entity;
     }
 
     @Override
-    public void beforeDeleteInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
+    public void beforeDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException {
     }
 }

@@ -6,14 +6,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- *
+ *Classe interceptor che permette di specificare informazioni aggiuntive sull'interceptor
  * @author gdm
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface Interceptor {
+public @interface NextSdrInterceptor {
 
-    public Class target();
-
+    /**
+     * Permette di specificare il nome dell'interceptor
+     * Non Ancora utilizzato
+     * @return
+     */
     public String name();
 }

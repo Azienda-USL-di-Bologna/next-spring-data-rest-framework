@@ -1,10 +1,18 @@
 package it.nextsw.common.projections;
 
 import com.google.common.base.CaseFormat;
-import it.nextsw.common.utils.EntityReflectionUtils;
-import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.utils.CommonUtils;
+import it.nextsw.common.utils.EntityReflectionUtils;
+import it.nextsw.common.utils.exceptions.EntityReflectionException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -12,15 +20,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.persistence.ManyToMany;
-import javax.persistence.OneToMany;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  *
