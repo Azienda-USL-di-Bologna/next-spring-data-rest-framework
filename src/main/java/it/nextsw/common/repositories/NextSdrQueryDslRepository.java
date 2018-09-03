@@ -32,7 +32,7 @@ import org.springframework.data.querydsl.binding.QuerydslBindings;
  * @param <ID>
  * @param <T>
  */
-public interface CustomQueryDslRepository<E extends Object, ID extends Object, T extends EntityPath<?>>
+public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, T extends EntityPath<?>>
         extends QuerydslBinderCustomizer<T>,
         QuerydslPredicateExecutor<E> {
 

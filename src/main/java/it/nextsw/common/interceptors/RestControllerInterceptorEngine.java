@@ -1,6 +1,5 @@
 package it.nextsw.common.interceptors;
 
-import com.google.common.collect.Streams;
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
@@ -16,8 +15,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- *
- * @author gdm
+ * Questa è la classe registro che si occupa di smistare le richieste agli {@link NextSdrControllerInterceptor}
+ * adeguati, ovvero che dichiarano come {@link NextSdrControllerInterceptor#getTargetEntityClass()} la classe della richiesta
  */
 @Component
 public class RestControllerInterceptorEngine {
@@ -34,15 +33,14 @@ public class RestControllerInterceptorEngine {
 
     @Autowired
     @Qualifier(value = "interceptorsMap")
-    protected Map<String, List<RestControllerInterceptor>> interceptorsMap;
+    protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
     
-//    private static final Map<String, List<RestControllerInterceptor>> INTERCEPTORS = new ConcurrentHashMap<>();
 
     public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, EntityReflectionException {
 //        fillInterceptorsCache();
-        List<RestControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
-            for (RestControllerInterceptor interceptor : interceptors) {
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
                 initialPredicate = interceptor.beforeSelectQueryInterceptor(initialPredicate, additionalData, request);
             }
         }
@@ -62,9 +60,9 @@ public class RestControllerInterceptorEngine {
         }
 
 //        fillInterceptorsCache();
-        List<RestControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
-            for (RestControllerInterceptor interceptor : interceptors) {
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
                 if (entity != null) {
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
                 } else {
@@ -77,10 +75,10 @@ public class RestControllerInterceptorEngine {
 
     public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
-        List<RestControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
-            for (RestControllerInterceptor interceptor : interceptors) {
-                entity = interceptor.beforeCreateInterceptor(entity, additionalData, request);
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                entity = interceptor.beforeCreateEntityInterceptor(entity, additionalData, request);
             }
         }
         return entity;
@@ -88,10 +86,10 @@ public class RestControllerInterceptorEngine {
 
     public Object executebeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
-        List<RestControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
-            for (RestControllerInterceptor interceptor : interceptors) {
-                entity = interceptor.beforeUpdateInterceptor(entity, additionalData, request);
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                entity = interceptor.beforeUpdateEntityInterceptor(entity, additionalData, request);
             }
         }
         return entity;
@@ -99,16 +97,16 @@ public class RestControllerInterceptorEngine {
 
     public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
-        List<RestControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
-            for (RestControllerInterceptor interceptor : interceptors) {
-                interceptor.beforeDeleteInterceptor(entity, additionalData, request);
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                interceptor.beforeDeleteEntityInterceptor(entity, additionalData, request);
             }
         }
         return entity;
     }
 
-    public List<RestControllerInterceptor> getInterceptors(Class entityClass) {
+    public List<NextSdrControllerInterceptor> getInterceptors(Class entityClass) {
         return interceptorsMap.get(entityClass.getName());
     }
 
@@ -118,7 +116,7 @@ public class RestControllerInterceptorEngine {
      * @return 
      */
     public boolean isImplementedBeforeQueryInterceptor(Class entityClass) {
-        List<RestControllerInterceptor> interceptors = interceptorsMap.get(entityClass.getName());
-        return interceptors != null && interceptors.stream().anyMatch((interceptor) -> (Arrays.stream(interceptor.getClass().getDeclaredMethods()).anyMatch(method -> method.getName().equals(RestControllerInterceptor.BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME))));
+        List<NextSdrControllerInterceptor> interceptors = interceptorsMap.get(entityClass.getName());
+        return interceptors != null && interceptors.stream().anyMatch((interceptor) -> (Arrays.stream(interceptor.getClass().getDeclaredMethods()).anyMatch(method -> method.getName().equals(NextSdrControllerInterceptor.BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME))));
     }
 }

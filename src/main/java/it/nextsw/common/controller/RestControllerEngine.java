@@ -1,5 +1,6 @@
 package it.nextsw.common.controller;
 
+import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,13 +10,14 @@ import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.EntityPathBase;
 import com.querydsl.core.types.dsl.PathBuilder;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
 import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
-import it.nextsw.common.repositories.CustomQueryDslRepository;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -24,8 +26,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,10 +45,11 @@ import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.ResourceAssembler;
 
 /**
- *
+ * Questa è la classe che deve essere estesa dai controller che vogliono accedere
+ * alle funzionalità degli {@link NextSdrInterceptor}
  * @author spritz
  */
-//@RestController
+
 public abstract class RestControllerEngine {
 
     @Autowired
@@ -83,7 +84,7 @@ public abstract class RestControllerEngine {
      */
     @Autowired
     @Qualifier(value = "customRepositoryMap")
-    protected Map<String, CustomQueryDslRepository> customRepositoryMap;
+    protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
 
     private Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
@@ -382,14 +383,14 @@ public abstract class RestControllerEngine {
         return entity;
     }
 
-    protected CustomQueryDslRepository getGeneralRepository(HttpServletRequest request) throws RestControllerEngineException {
+    protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath().substring(BASE_URL.length() + 1);
         int slashPos = repositoryKey.indexOf("/");
         if (slashPos != -1) {
             repositoryKey = repositoryKey.substring(0, slashPos);
         }
 
-        CustomQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
+        NextSdrQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
         return generalRepository;
     }
 
@@ -447,16 +448,16 @@ public abstract class RestControllerEngine {
         /**
          * qui serve il repository specifico, ma essendo qui in una funzione
          * generica, tutti i nostri repository estendono
-         * CustomQueryDslRepository; così facendo si ha un'interfaccia (quella
+         * NextSdrQueryDslRepository; così facendo si ha un'interfaccia (quella
          * di repository) che estende un'altra interfaccia
-         * (CustomQueryDslRepository), avendo così due tipi disponibili. Così
+         * (NextSdrQueryDslRepository), avendo così due tipi disponibili. Così
          * facendo ogni nostro repository è anche di tipo
-         * CustomQueryDslRepository.
+         * NextSdrQueryDslRepository.
          *
          * Spring ha una mappa dove la chiave ha il nome della classe in
          * lowerCamelcase mentre il valore corrisponde al valore dei repository
          */
-        CustomQueryDslRepository generalRepository = getGeneralRepository(request);
+        NextSdrQueryDslRepository generalRepository = getGeneralRepository(request);
         try {
             // inserimento come predicato dell'eventuale interceptor
             predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap);
@@ -518,6 +519,7 @@ public abstract class RestControllerEngine {
             Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             // assembla il risultato in HAL
             resource = assembler.toResource(projected);
+//            resource = assembler.toResource(entities);
         }
         return resource;
     }

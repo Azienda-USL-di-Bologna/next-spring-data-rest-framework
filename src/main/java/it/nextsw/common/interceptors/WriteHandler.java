@@ -4,11 +4,11 @@ package it.nextsw.common.interceptors;
 //
 //import java.io.Serializable;
 //
-//import org.hibernate.EmptyInterceptor;
+//import org.hibernate.NextSdrEmptyControllerInterceptor;
 //import org.hibernate.Transaction;
 //import org.hibernate.type.Type;
 //
-//public class WriteHandler extends EmptyInterceptor {
+//public class WriteHandler extends NextSdrEmptyControllerInterceptor {
 //
 //    private int updates;
 //    private int creates;
