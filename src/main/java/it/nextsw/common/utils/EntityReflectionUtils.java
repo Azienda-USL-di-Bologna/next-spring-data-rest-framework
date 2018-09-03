@@ -3,6 +3,11 @@ package it.nextsw.common.utils;
 import com.google.common.base.CaseFormat;
 import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.rest.core.annotation.RepositoryRestResource;
+import org.springframework.stereotype.Component;
+
+import javax.persistence.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
@@ -10,14 +15,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.persistence.Id;
-import javax.persistence.ManyToMany;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.rest.core.annotation.RepositoryRestResource;
-import org.springframework.stereotype.Component;
 
 /**
  *
@@ -192,7 +189,7 @@ public class EntityReflectionUtils {
     public static Annotation getFirstAnnotationOverHierarchy(Class objectClass, Class annotationClass) throws ClassNotFoundException {
         AnnotatedType[] annotatedInterfaces = objectClass.getAnnotatedInterfaces();
         for (AnnotatedType annotatedType : annotatedInterfaces) {
-                objectClass = Class.forName(annotatedType.getType().getTypeName());
+                objectClass = (Class) annotatedType.getType();
             do {
                 Annotation annotation = objectClass.getAnnotation(annotationClass);
                 if (annotation != null) {
