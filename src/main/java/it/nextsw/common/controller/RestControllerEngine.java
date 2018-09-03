@@ -516,10 +516,10 @@ public abstract class RestControllerEngine {
                 throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
             }
             // per ogni elemento della pagina gli si applica la createProjection
-           // Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
+            Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             // assembla il risultato in HAL
-           // resource = assembler.toResource(projected);
-            resource = assembler.toResource(entities);
+            resource = assembler.toResource(projected);
+//            resource = assembler.toResource(entities);
         }
         return resource;
     }
