@@ -16,8 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Set;
+import java.util.Collection;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,9 +57,9 @@ public class ForeignKeyExporter {
 //        Field field = SourceEntity.getClass().getDeclaredField(fieldName);
 
         /**
-         * può essere un Set o una Lista o un 'Entità. esempio Set<Pec>
+         * può essere una Collection o un 'Entità. esempio List<Pec>
          */
-        if (field.getType().isAssignableFrom(Set.class) || field.getType().isAssignableFrom(List.class)) {
+        if (Collection.class.isAssignableFrom(field.getType())) {
 //            OneToMany annotation = field.getAnnotationsByType(OneToMany.class)[0];
 //            String filterFieldName = annotation.mappedBy();
 //            System.out.println("asfdfdafasf:  " + annotation.mappedBy());
