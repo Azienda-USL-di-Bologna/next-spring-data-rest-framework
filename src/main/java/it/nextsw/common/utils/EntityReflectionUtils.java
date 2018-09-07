@@ -3,7 +3,6 @@ package it.nextsw.common.utils;
 import com.google.common.base.CaseFormat;
 import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
 
@@ -23,26 +22,6 @@ import java.util.List;
 @Component
 public class EntityReflectionUtils {
 
-    @Value("${common.projection.package:}")
-    private String projectionPackage;
-
-    @Value("${common.projection.generated.package:}")
-    private String generatedProjectionPackage;
-
-    public Class<?> getProjectionClass(String projection) {
-        Class<?> projectionClass = null;
-        try {
-            projectionClass = Class.forName(projectionPackage + "." + projection);
-        } catch (ClassNotFoundException ex) {
-            try {
-                projectionClass = Class.forName(generatedProjectionPackage + "." + projection);
-            } catch (ClassNotFoundException subex) {
-                // loggare errore
-            }
-        }
-        return projectionClass;
-    }
-
     public Method getPrimaryKeySetMethod(Object entity) throws NoSuchMethodException {
         return getPrimaryKeySetMethod(entity.getClass());
     }
@@ -51,6 +30,12 @@ public class EntityReflectionUtils {
         Field primaryKeyField = getPrimaryKeyField(entityClass);
         Class fieldType = primaryKeyField.getType();
         return entityClass.getMethod("set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, primaryKeyField.getName()), fieldType);
+    }
+    
+    public boolean hasSerialPrimaryKey(Class entityClass) throws NoSuchMethodException {
+        Field primaryKeyField = getPrimaryKeyField(entityClass);
+        GeneratedValue generatedValueAnnotation = primaryKeyField.getAnnotation(GeneratedValue.class);
+        return generatedValueAnnotation != null;
     }
 
     public Method getPrimaryKeyGetMethod(Object entity) throws NoSuchMethodException {

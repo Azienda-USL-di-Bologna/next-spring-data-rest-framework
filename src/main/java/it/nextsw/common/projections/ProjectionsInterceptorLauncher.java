@@ -40,6 +40,13 @@ public class ProjectionsInterceptorLauncher {
     @Autowired
     @Qualifier(value = "customRepositoryMap")
     protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
+    
+    /**
+     * mappa delle projections
+     */
+    @Autowired
+    @Qualifier(value = "projectionsMap")
+    private Map<String, Class> projectionsMap;
 
     @Autowired
     private RestControllerInterceptorEngine restControllerInterceptor;
@@ -141,7 +148,7 @@ public class ProjectionsInterceptorLauncher {
             }
             entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
             if (entity != null) {
-                Class<?> projectionClass = entityReflectionUtils.getProjectionClass(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata 
+                Class<?> projectionClass = projectionsMap.get(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata 
                 entity = factory.createProjection(projectionClass, entity); // Applico la projection con i campi base al risultato
                 threadLocalParams.get().entityMap.put(pred.toString(), entity);
             }
@@ -226,7 +233,7 @@ public class ProjectionsInterceptorLauncher {
             
             // Eseguo l'interceptor after select.
             entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
-            Class<?> projectionClass = entityReflectionUtils.getProjectionClass(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
+            Class<?> projectionClass = projectionsMap.get(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
             if (List.class.isAssignableFrom(entitiesFound.getClass())) {
                 entities = (List) StreamSupport.stream(entitiesFound.spliterator(), false)
                     .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());

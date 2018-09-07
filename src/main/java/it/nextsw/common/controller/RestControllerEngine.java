@@ -14,25 +14,36 @@ import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
+import it.nextsw.common.configurations.NextSdrProjectionsConfiguration;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
 import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
+import java.io.IOException;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +63,8 @@ import org.springframework.hateoas.ResourceAssembler;
 
 public abstract class RestControllerEngine {
 
+    private static final org.slf4j.Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
+    
     @Autowired
     protected EntityReflectionUtils entityReflectionUtils;
 
@@ -85,6 +98,14 @@ public abstract class RestControllerEngine {
     @Autowired
     @Qualifier(value = "customRepositoryMap")
     protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
+    
+    /**
+     * mappa delle projections
+     */
+    @Autowired
+    @Qualifier(value = "projectionsMap")
+    private Map<String, Class> projectionsMap;
+    
 
     private Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
@@ -138,6 +159,20 @@ public abstract class RestControllerEngine {
              * "grezzi" espressi in (chiave-valore) passati nella richiesta
              * attraverso fasterxml.jackson
              */
+            
+//            try {
+//                ObjectMapper customObjMapper = new ObjectMapper().configure(com.fasterxml.jackson.core.JsonGenerator.Feature.IGNORE_UNKNOWN, true)
+//                    .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);                
+//                String writeValueAsString = customObjMapper.writeValueAsString(data);
+//                System.out.println(writeValueAsString);
+//                Object entity1 = customObjMapper.readValue(writeValueAsString, entityClass);
+//                Object entity2 = objectMapper.convertValue(data, entityClass);
+//                System.out.println(entity1);
+//                System.out.println(entity2);
+//            } catch (IOException ex) {
+//                Logger.getLogger(RestControllerEngine.class.getName()).log(Level.SEVERE, null, ex);
+//            }
+            
             Object entity = objectMapper.convertValue(data, entityClass);
 
             /**
@@ -145,10 +180,13 @@ public abstract class RestControllerEngine {
              * sarà calcolato e non deve essere considerato se passato),
              * chiamando il metodo setId passando come valore null
              */
-            Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(entity);
-            // si ottiene il metodo set della primary key e lo si setta a null
-            primaryKeySetMethod.invoke(entity, (Object) null);
-            System.out.println(String.format("sto invocando %s.%s(%s)", entity.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
+            if (entityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
+                Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(entity);
+                // si ottiene il metodo set della primary key e lo si setta a null
+                primaryKeySetMethod.invoke(entity, (Object) null);
+                log.warn(String.format("sto invocando %s.%s(%s)", entity.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
+            }
+            
             /**
              * gestione di inserimento / gestione degli oggetti annidati. Qui
              * saranno considerati anche gli eventuali interceptor settati per
@@ -164,6 +202,7 @@ public abstract class RestControllerEngine {
 
             // inserimento dell'entità
             generalRepository.save(entity);
+            //if (true) throw new RestControllerEngineException("stoppo per test");
             // viene ritornata l'entità inserita con tutti i campi, compreso l'id generato
             Class projectionClass = getProjectionClass(null, request);
             entity = factory.createProjection(projectionClass, entity);
@@ -191,6 +230,7 @@ public abstract class RestControllerEngine {
      */
     private void manageNestedEntity(boolean insert, Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, RollBackInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException, EntityReflectionException {
         Map<String, Object> childMapValue = (Map<String, Object>) childMap;
+        System.out.println(Arrays.toString( ((Map)childMap).values().toArray() ));
         for (String key : childMapValue.keySet()) {
             /**
              * se sono stati passati dei campi ForeignKey (cioè che iniziano con
@@ -213,26 +253,40 @@ public abstract class RestControllerEngine {
                 Object foregnKeyObject = childMapValue.get(key);
                 ForeignKey fk = objectMapper.convertValue(foregnKeyObject, ForeignKey.class);
 
-                /**
-                 * viene creata l'entità tramite entity manager in modo che
-                 * hibernate capisca che non la deve inserire
-                 */
-                Object fkReference = em.getReference(fkField.getType(), fk.getId());
+                // non ha senso passare un campo "fk_" con id null, ma se per caso viene passato, lo ignoriamo per non incorrere in un'eccezione
+                if (fk.getId() != null) {
+                    /**
+                     * viene creata l'entità tramite entity manager in modo che
+                     * hibernate capisca che non la deve inserire
+                     */
+                    Object fkReference = em.getReference(fkField.getType(), fk.getId());
 
-                /**
-                 * si ottiene il campo che setta la fk sulla classe dell'entità
-                 * e viene invocato per settarla
-                 */
-                Method setFkMethod = getSetMethod(fieldValue.getClass(), fkField.getName());
-                setFkMethod.invoke(fieldValue, fkReference);
+                    /**
+                     * si ottiene il campo che setta la fk sulla classe dell'entità
+                     * e viene invocato per settarla
+                     */
+                    Method setFkMethod = getSetMethod(fieldValue.getClass(), fkField.getName());
+                    setFkMethod.invoke(fieldValue, fkReference);
+                }
             } else {
                 /**
                  * caso in cui è necessario inserire l'entity
                  */
-                Method getMethod = getGetMethod(fieldValue.getClass(), key);
+                
+                String fieldName = key;
+                Class entityClass = entityReflectionUtils.getEntityFromProxyObject(fieldValue);
+                Field entityCollectionField = entityClass.getDeclaredField(fieldName);
+                
+                Method setMethod = getSetMethod(entityClass, key);
+                Method getMethod = getGetMethod(entityClass, key);
+                
                 Object fieldChildValue = getMethod.invoke(fieldValue);
                 Object dataChildValue = childMapValue.get(key);
+                
                 if (fieldChildValue != null && entityReflectionUtils.isEntityClassFromProxyObject(fieldChildValue.getClass())) {
+                    
+                    // si richiama il metodo se ci sono altre entità innestate
+                    manageNestedEntity(insert, fieldChildValue, dataChildValue, request, additionalDataMap);
                     if (!insert) {
                         Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildValue.getClass());
                         Object id = ((Map<String, Object>) dataChildValue).get(primaryKeyField.getName());
@@ -241,11 +295,10 @@ public abstract class RestControllerEngine {
                             fieldChildValue = merge((Map<String, Object>) dataChildValue, fieldChildValue, request, additionalDataMap);
                             fieldChildValue = restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildValue, request, additionalDataMap);
                         } else {
-                            Method setMethod = getSetMethod(fieldValue.getClass(), key);
-                            Class<?> type = entityReflectionUtils.getEntityFromProxyObject(fieldChildValue);
-                            Object value = objectMapper.convertValue(dataChildValue, type);
+//                            Class<?> type = entityReflectionUtils.getEntityFromProxyObject(fieldChildValue);
+//                            Object value = objectMapper.convertValue(dataChildValue, type);
                             fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
-                            setMethod.invoke(fieldValue, value);
+                            setMethod.invoke(fieldValue, fieldChildValue);
                         }
                     } else {
                         // togliamo l'eventuale id(passato), chiamando il metodo setId con null
@@ -255,9 +308,47 @@ public abstract class RestControllerEngine {
                         // lanciamo l'interceptor
                         fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
                     }
-                    // si richiama il metodo se ci sono altre entità innestate
-                    manageNestedEntity(insert, fieldChildValue, dataChildValue, request, additionalDataMap);
+//                    // si richiama il metodo se ci sono altre entità innestate
+//                    manageNestedEntity(insert, fieldChildValue, dataChildValue, request, additionalDataMap);
+                } else if (fieldChildValue != null && Collection.class.isAssignableFrom(fieldChildValue.getClass())){
+                    Collection fieldChildsCollection = (Collection) fieldChildValue;
+                    Collection dataChildsCollection = (Collection) dataChildValue;
+                    Iterator dataChildsCollectionIterator = dataChildsCollection.iterator();
+                    for (Object fieldChildCollectionValue : fieldChildsCollection) {
+                        Object dataChildCollectionValue = dataChildsCollectionIterator.next();
+       
+
+                        String filterFieldName = entityReflectionUtils.getFilterFieldName(entityCollectionField, entityClass);
+                        
+                        ((Map)((Map)dataChildCollectionValue)).remove(filterFieldName);
+                        ((Map)((Map)dataChildCollectionValue)).remove("fk_" + filterFieldName);
+                        Method setParentFkMethod = getSetMethod(fieldChildCollectionValue.getClass(), filterFieldName);
+                        
+                        setParentFkMethod.invoke(fieldChildCollectionValue, fieldValue);
+                        System.out.println(fieldChildValue);
+                        
+                        manageNestedEntity(insert, fieldChildCollectionValue, dataChildCollectionValue, request, additionalDataMap);
+                        if (!insert) {
+                            Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildCollectionValue.getClass());
+                            Object id = ((Map<String, Object>) dataChildCollectionValue).get(primaryKeyField.getName());
+                            if (id == null) {
+                                fieldChildCollectionValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildCollectionValue, request, additionalDataMap);
+                            }
+                            else {
+                                fieldChildCollectionValue = restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildCollectionValue, request, additionalDataMap);
+                            }
+                        }
+                        else {
+                            // togliamo l'eventuale id(passato), chiamando il metodo setId con null
+                            Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(fieldChildCollectionValue);
+                            System.out.println(String.format("sto invocando %s.%s(%s)", fieldChildCollectionValue.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
+                            primaryKeySetMethod.invoke(fieldChildCollectionValue, (Object) null);
+                            // lanciamo l'interceptor
+                            fieldChildCollectionValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildCollectionValue, request, additionalDataMap);
+                        }
+                    }
                 }
+               
             }
         }
     }
@@ -317,12 +408,13 @@ public abstract class RestControllerEngine {
         }
     }
 
-    private Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException, EntityReflectionException {
+    private Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchFieldException, EntityReflectionException, ClassNotFoundException {
         for (String key : data.keySet()) {
             if (!key.startsWith("fk_")) {
                 Object value = data.get(key);
 
                 Method setMethod = getSetMethod(entity.getClass(), key);
+                Method getMethod = getGetMethod(entity.getClass(), key);
                 if (value != null) {
                     if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
 //                    String pattern = "yyyy-MM-dd['T'HH:mm:ss.Z]";
@@ -358,6 +450,33 @@ public abstract class RestControllerEngine {
                          * costruito partendo dai parametri passati
                          */
                         setMethod.invoke(entity, value);
+                    } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
+
+                        Type actualTypeArgument = ((ParameterizedType)setMethod.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
+                        
+                        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                        Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
+                        Field field = trueEntityClass.getDeclaredField(key);
+                        String filterFieldName = entityReflectionUtils.getFilterFieldName(field, trueEntityClass);
+                        Collection childValues = (Collection) value;
+                        Collection elementsCollection = (Collection)getMethod.invoke(entity);
+                        elementsCollection.clear();
+                        for (Object childValue : childValues) {
+//                            Field field = trueEntityClass.getDeclaredField(key);
+                            Object childEntity = objectMapper.convertValue(childValue, childEntityClass);
+//                            if (childValue != null) {
+//                                ((Map)childValue).remove(filterFieldName);
+//                                ((Map)childValue).remove("fk_" + filterFieldName);
+                                merge((Map<String, Object>) childValue, childEntity, request, additionalDataMap);
+                                
+                                elementsCollection.add(childEntity);
+//                            }
+//                            Method fkSetMethod = getSetMethod(childEntityClass, filterFieldName);
+//                            fkSetMethod.invoke(childEntity, entity);
+//                            System.out.println(childEntity);
+                        }
+                        //setMethod.invoke(entity, childValues);
+                        
                     } else {
                         Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
                         Field field = trueEntityClass.getDeclaredField(key);
@@ -403,7 +522,7 @@ public abstract class RestControllerEngine {
                 throw new RestControllerEngineException(ex);
             }
         } else {
-            res = entityReflectionUtils.getProjectionClass(projection);
+            res = projectionsMap.get(projection);
         }
         return res;
     }
