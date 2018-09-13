@@ -572,8 +572,8 @@ public abstract class RestControllerEngine {
                         Collection elementsCollection = (Collection)getMethod.invoke(entity);
 
                         /** 
-                         * dentro la mappa "deletedEntitiesMap" salvo per ogni metodo get di ogni entità sulla quale ho passato dei valori collection,
-                         * una collection che contiene gli elementi che saranno rimossi al salvataggio. 
+                         * dentro la mappa "deletedEntitiesMap" salvo una collection che contiene gli elementi che saranno rimossi al salvataggio
+                         * (per ogni metodo get di ogni entità sulla quale ho passato dei valori collection).
                          * Gli elementi che saranno rimossi sono quelli presenti sull'entità, ma che non sono passati nel json della richiesta.
                          * La chiave della mappa è il nome canonico del metodo get (es. it.ausl.bologna.ir.Azienda.setAttivitaList), che contiene
                          * sia il nome dell'entià che il nome della collection sulla quale si sta agendo.
