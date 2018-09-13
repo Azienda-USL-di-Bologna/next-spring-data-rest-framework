@@ -58,7 +58,7 @@ public class NextSdrRepositoriesConfiguration {
     @Autowired
     private Map<String, NextSdrQueryDslRepository> repositoryMap;
     
-     @Autowired
+    @Autowired
     private ListableBeanFactory beanFactory;
 
     private static final Logger log = LoggerFactory.getLogger(NextSdrRepositoriesConfiguration.class);
@@ -69,12 +69,12 @@ public class NextSdrRepositoriesConfiguration {
         List<Object> repositoriesList = applicationContext.getBeansWithAnnotation(NextSdrRepository.class)
                 .values().stream().collect(Collectors.toList());
         for (Object repository: repositoriesList){
-            NextSdrRepository nextSdrRepository = (NextSdrRepository) EntityReflectionUtils.getFirstAnnotationOverHierarchy(repository.getClass(),NextSdrRepository.class);
+            NextSdrRepository nextSdrRepositoryAnnotation = (NextSdrRepository) EntityReflectionUtils.getFirstAnnotationOverHierarchy(repository.getClass(), NextSdrRepository.class);
             if (!NextSdrQueryDslRepository.class.isAssignableFrom(repository.getClass())){
                 throw new RuntimeException(String.format("La classe repository %s non estende l'interfaccia %s ",
                         repository.getClass().getName(), NextSdrQueryDslRepository.class.getName()));
             }
-            repositories.put(nextSdrRepository.repositoryPath(), (NextSdrQueryDslRepository) repository);
+            repositories.put(nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
         }
 
 
