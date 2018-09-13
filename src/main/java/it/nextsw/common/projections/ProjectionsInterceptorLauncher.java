@@ -15,6 +15,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -39,6 +40,13 @@ public class ProjectionsInterceptorLauncher {
     @Autowired
     @Qualifier(value = "customRepositoryMap")
     protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
+    
+    /**
+     * mappa delle projections
+     */
+    @Autowired
+    @Qualifier(value = "projectionsMap")
+    private Map<String, Class> projectionsMap;
 
     @Autowired
     private RestControllerInterceptorEngine restControllerInterceptor;
@@ -74,7 +82,7 @@ public class ProjectionsInterceptorLauncher {
 
     /**
      * Questo metodo viene lanciato da un annotazione sui campi expand delle
-     * projections nei casi di expand di un oggetto singolo (Non List/Set). Alla
+     * projections nei casi di expand di un oggetto singolo (Non Collection). Alla
      * query dell'expand vengono applicati gli interceptor di Before Select e
      * After Select.
      *
@@ -140,7 +148,7 @@ public class ProjectionsInterceptorLauncher {
             }
             entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
             if (entity != null) {
-                Class<?> projectionClass = entityReflectionUtils.getProjectionClass(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata 
+                Class<?> projectionClass = projectionsMap.get(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata 
                 entity = factory.createProjection(projectionClass, entity); // Applico la projection con i campi base al risultato
                 threadLocalParams.get().entityMap.put(pred.toString(), entity);
             }
@@ -175,7 +183,7 @@ public class ProjectionsInterceptorLauncher {
      * @throws NoSuchFieldException
      * @throws InterceptorException 
      */
-    public Set lanciaInterceptorSet(Object target, String methodName) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException {
+    public Collection lanciaInterceptorCollection(Object target, String methodName) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException {
         Class targetEntityClass = entityReflectionUtils.getEntityFromProxyObject(target);
         Method method = targetEntityClass.getMethod(methodName);
         // Come returnType voglio il tipo dell'entità all'interno del Set/List. Per trovarlo bisogna castare a ParameterizedType il risultato di getGenericReturnType() sul metodo trattato.
@@ -209,7 +217,7 @@ public class ProjectionsInterceptorLauncher {
         }
         
         // vedo se ho già l'entità nella mappa cache
-        Set entities = (Set) threadLocalParams.get().entityMap.get(pred.toString());
+        Collection entities = (Collection) threadLocalParams.get().entityMap.get(pred.toString());
         if (entities == null) {
             Collection entitiesFound;
 //            List<NextSdrControllerInterceptor> interceptorsFound = restControllerInterceptor.getInterceptors(entityReflectionUtils.getEntityFromProxyClass(returnType));
@@ -225,9 +233,15 @@ public class ProjectionsInterceptorLauncher {
             
             // Eseguo l'interceptor after select.
             entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
-            Class<?> projectionClass = entityReflectionUtils.getProjectionClass(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
-            entities = (Set) StreamSupport.stream(entitiesFound.spliterator(), false)
+            Class<?> projectionClass = projectionsMap.get(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
+            if (List.class.isAssignableFrom(entitiesFound.getClass())) {
+                entities = (List) StreamSupport.stream(entitiesFound.spliterator(), false)
+                    .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());
+            }
+            else {
+                entities = (List) StreamSupport.stream(entitiesFound.spliterator(), false)
                     .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
+            }
             threadLocalParams.get().entityMap.put(pred.toString(), entities);
         }
 

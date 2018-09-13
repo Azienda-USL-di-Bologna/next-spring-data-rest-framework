@@ -13,6 +13,7 @@ import com.querydsl.core.types.dsl.StringPath;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -75,9 +76,16 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     Predicate res;
                     if (values.size() == 1) {
                         DateTimePath dateTimePath = (DateTimePath) path;
-                        LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
-                        LocalDateTime endDate = startDate.plusDays(1);
-                        res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                        if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
+                            res = dateTimePath.isNull();
+                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))){
+                            res = dateTimePath.isNotNull();
+                        } else {               
+                            dateTimePath = (DateTimePath) path;
+                            LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
+                            LocalDateTime endDate = startDate.plusDays(1);
+                            res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                        }
                     } else if (dates.size() == 2) {
                         Collections.sort(dates);
                         DateTimePath dateTimePath = (DateTimePath) path;
