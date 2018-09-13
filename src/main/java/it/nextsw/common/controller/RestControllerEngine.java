@@ -15,10 +15,10 @@ import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
-import it.nextsw.common.configurations.NextSdrProjectionsConfiguration;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
-import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
+import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
+import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
 import java.io.IOException;
 
@@ -39,9 +39,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -150,9 +147,9 @@ public abstract class RestControllerEngine {
      * @param additionalData
      * @return
      * @throws RestControllerEngineException
-     * @throws RollBackInterceptorException
+     * @throws AbortSaveInterceptorException
      */
-    protected Object insert(Map<String, Object> data, Class entityClass, HttpServletRequest request, String additionalData) throws RestControllerEngineException, RollBackInterceptorException {
+    protected Object insert(Map<String, Object> data, Class entityClass, HttpServletRequest request, String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         // istanziazione del repository corretto
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
@@ -162,23 +159,10 @@ public abstract class RestControllerEngine {
              * "grezzi" espressi in (chiave-valore) passati nella richiesta
              * attraverso fasterxml.jackson
              */
-            
-//            try {
-//                ObjectMapper customObjMapper = new ObjectMapper().configure(com.fasterxml.jackson.core.JsonGenerator.Feature.IGNORE_UNKNOWN, true)
-//                    .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);                
-//                String writeValueAsString = customObjMapper.writeValueAsString(data);
-//                System.out.println(writeValueAsString);
-//                Object entity1 = customObjMapper.readValue(writeValueAsString, entityClass);
-//                Object entity2 = objectMapper.convertValue(data, entityClass);
-//                System.out.println(entity1);
-//                System.out.println(entity2);
-//            } catch (IOException ex) {
-//                Logger.getLogger(RestControllerEngine.class.getName()).log(Level.SEVERE, null, ex);
-//            }
-            
+
             Object entity = objectMapper.convertValue(data, entityClass);
             boolean inserting = true;
-            
+
             /**
              * se ho un id seriale e ho passato un id nell'oggetto da inserire lo elimino chiamando 
              * il metodo setId passando come valore null
@@ -248,7 +232,7 @@ public abstract class RestControllerEngine {
      * @param request
      * @param additionalDataMap
      * @throws ClassNotFoundException
-     * @throws RollBackInterceptorException
+     * @throws AbortSaveInterceptorException
      * @throws RestControllerEngineException
      * @throws IllegalAccessException
      * @throws IllegalArgumentException
@@ -256,7 +240,7 @@ public abstract class RestControllerEngine {
      * @throws NoSuchMethodException
      * @throws NoSuchFieldException
      */
-    private void manageNestedEntity(Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, RollBackInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException, EntityReflectionException, IOException {
+    private void manageNestedEntity(Object fieldValue, Object childMap, HttpServletRequest request, Map<String, String> additionalDataMap) throws ClassNotFoundException, AbortSaveInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException, EntityReflectionException, IOException {
         Map<String, Object> childMapValue = (Map<String, Object>) childMap;
         System.out.println(Arrays.toString( ((Map)childMap).values().toArray() ));
         for (String key : childMapValue.keySet()) {
@@ -359,9 +343,9 @@ public abstract class RestControllerEngine {
 
                         // se si creerà una nuova entità lancio l'interceptor beforeCreate, strimenti il beforeUpdate
                         if (creatingNewEntity)
-                            fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
+                            restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
                         else
-                            fieldChildValue = restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildValue, request, additionalDataMap);
+                            restControllerInterceptor.executebeforeUpdateInterceptor(fieldChildValue, request, additionalDataMap);
                     } else { // in questo caso non è stato passato l'id per cui l'entità è per forza da inserire, per cui lancio l'intereptor beforeCreate
                         fieldChildValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildValue, request, additionalDataMap);
                         setMethod.invoke(fieldValue, fieldChildValue); // TODO: probabilmente di questo si può fare a meno, verificare
@@ -442,8 +426,13 @@ public abstract class RestControllerEngine {
                     // se ci sono delle entity che verranno cancellate eseguo il beforeDeleteInterceptor
                     Collection deletedEntities = deletedEntitiesMap.get(getMethod.toGenericString());
                     for (Object deletedEntity : deletedEntities) {
-                        // TODO: magari prevedere un'eccezione abortDelete che nel caso sia lanciata dall'interceptor annulli l'eliminazione di questa entità( riaggiungendola nella lista)
-                        restControllerInterceptor.executebeforeDeleteInterceptor(deletedEntity, request, additionalDataMap);    
+                        try {
+                            restControllerInterceptor.executebeforeDeleteInterceptor(deletedEntity, request, additionalDataMap);
+                        }
+                        catch (SkipDeleteInterceptorException ex) {
+                            log.info("eliminazione annullata dall'interceptor", ex);
+                            fieldChildsCollection.add(deletedEntity);
+                        }
                     }
                     
                     
@@ -460,9 +449,9 @@ public abstract class RestControllerEngine {
      * @param request
      * @param additionalData
      * @throws RestControllerEngineException
-     * @throws RollBackInterceptorException
+     * @throws AbortSaveInterceptorException
      */
-    protected void delete(Object entity, HttpServletRequest request, String additionalData) throws RestControllerEngineException, RollBackInterceptorException {
+    protected void delete(Object entity, HttpServletRequest request, String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
 
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
@@ -471,6 +460,8 @@ public abstract class RestControllerEngine {
             generalRepository.delete(entity);
         } catch (ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
+        } catch (SkipDeleteInterceptorException ex) {
+            log.info("eliminazione annullata dall'interceptor", ex);
         }
 
     }
@@ -508,7 +499,7 @@ public abstract class RestControllerEngine {
             res = factory.createProjection(projectionClass, res);
 
             return res;
-        } catch (RestControllerEngineException | RollBackInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException | IOException ex) {
+        } catch (RestControllerEngineException | AbortSaveInterceptorException | ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException | NoSuchMethodException | InvocationTargetException | EntityReflectionException | IOException ex) {
             throw new RestControllerEngineException("errore nell'update", ex);
         }
     }
