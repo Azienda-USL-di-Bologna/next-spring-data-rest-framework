@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.persistence.EntityManager;
+import javax.persistence.OneToMany;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.LoggerFactory;
@@ -423,21 +424,27 @@ public abstract class RestControllerEngine {
                         }
                     }
                     
-                    // se ci sono delle entity che verranno cancellate eseguo il beforeDeleteInterceptor
-                    Collection deletedEntities = deletedEntitiesMap.get(getMethod.toGenericString());
-                    for (Object deletedEntity : deletedEntities) {
-                        try {
-                            restControllerInterceptor.executebeforeDeleteInterceptor(deletedEntity, request, additionalDataMap);
-                        }
-                        catch (SkipDeleteInterceptorException ex) {
-                            log.info("eliminazione annullata dall'interceptor", ex);
-                            fieldChildsCollection.add(deletedEntity);
+                    /** 
+                     *  Se il campo FK dell'entità ha settato orphanRemoval = true, allora vuol dire che delle entità potrebbero essere cancellate.
+                     *  Nel caso queste entità saranno nella mappa "deletedEntitiesMap".
+                     *  Se ce ne sono eseguo il beforeDeleteInterceptor.
+                     */
+                    if (entityReflectionUtils.hasOrphanRemoval(entityField)) {
+                        Collection deletedEntities = deletedEntitiesMap.get(getMethod.toGenericString());
+                        if (deletedEntities != null && !deletedEntities.isEmpty()) {
+                            for (Object deletedEntity : deletedEntities) {
+                                try {
+                                    restControllerInterceptor.executebeforeDeleteInterceptor(deletedEntity, request, additionalDataMap);
+                                }
+                                catch (SkipDeleteInterceptorException ex) {
+                                    // se l'interceptor lancia l'eccezione "SkipDeleteInterceptorException" reinserisco l'entità nella collection in modo che non venga cancellata
+                                    log.info("eliminazione annullata dall'interceptor", ex);
+                                    fieldChildsCollection.add(deletedEntity);
+                                }
+                            }
                         }
                     }
-                    
-                    
                 }
-               
             }
         }
     }
