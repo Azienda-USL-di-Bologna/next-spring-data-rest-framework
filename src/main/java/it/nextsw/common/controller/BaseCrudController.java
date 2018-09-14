@@ -30,25 +30,25 @@ public abstract class BaseCrudController extends RestControllerEngine {
     
     @RequestMapping(value = {"*"}, method = {RequestMethod.POST, RequestMethod.PUT})
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> put(
+    protected ResponseEntity<?> insert(
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
-        System.out.println("POSTPOSTPOSTPOSTPOSTPOSTPOST");
+        log.info("executing insert operation...");
         Object entity = insert(data, request, additionalData);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
     @RequestMapping(value = {"*/{id}"}, method = RequestMethod.PATCH)
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> patch(
+    protected ResponseEntity<?> update(
             @PathVariable(required = true) String id,
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException {
-        System.out.println("PATCHPATCHPATCHPATCHPATCH");
+        log.info("executing update operation...");
         try {
-            Object update = update(id, data, request, additionalData);
+            Object update = super.update(id, data, request, additionalData);
             return new ResponseEntity(update, HttpStatus.OK);
         }
         catch (NotFoundResourceException ex) {
@@ -63,7 +63,7 @@ public abstract class BaseCrudController extends RestControllerEngine {
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
-        System.out.println("DELETEDELETEDELETEDELETEDELETE");
+        log.info("executing delete operation...");
         Object entity = get(id, request);
         if (entity != null) {
             delete(entity, request, additionalData);
@@ -78,7 +78,7 @@ public abstract class BaseCrudController extends RestControllerEngine {
             @PathVariable(required = true) String id,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
-        log.info();
+        log.info("executing batch operation...");
         
         return new ResponseEntity(HttpStatus.OK);
         
