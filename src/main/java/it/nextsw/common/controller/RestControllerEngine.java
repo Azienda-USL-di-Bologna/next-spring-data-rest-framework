@@ -40,9 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.persistence.EntityManager;
-import javax.persistence.OneToMany;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -63,7 +63,7 @@ import org.springframework.hateoas.ResourceAssembler;
 
 public abstract class RestControllerEngine {
 
-    private static final org.slf4j.Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
+    private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
     
     @Autowired
     protected EntityReflectionUtils entityReflectionUtils;
