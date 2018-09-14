@@ -66,7 +66,7 @@ public class RestControllerInterceptorEngine {
         }
 
 //        fillInterceptorsCache();
-        log.info(String.format("find %s interceptors on %s...", "afterSelectQueryInterceptor", entity.toString()));
+        log.info(String.format("find %s interceptors on %s...", "afterSelectQueryInterceptor", res.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
@@ -74,7 +74,7 @@ public class RestControllerInterceptorEngine {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
                 } else {
-                    log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
+                    log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entities.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
                 }
             }
