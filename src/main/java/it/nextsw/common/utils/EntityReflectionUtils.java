@@ -11,6 +11,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -221,4 +223,32 @@ public class EntityReflectionUtils {
         }
         return filterFieldName;
     }
+
+    /**
+     * Torna "true" se il campo dell'entità passato ha settato orphanRemoval = true sull'annotazione OneToMany o OneToOne
+     * "false" in tutti gli altri casi o se c'è un qualsiasi errore
+     * @param entityField il campo FK dell'entità
+     * @return 
+     */
+    public boolean hasOrphanRemoval(Field entityField) {
+        try {
+            OneToMany oneToManyAnnotation = entityField.getAnnotation(javax.persistence.OneToMany.class);
+            if (oneToManyAnnotation != null)
+                return oneToManyAnnotation.orphanRemoval();
+            else {
+                OneToOne oneToOneAnnotation = entityField.getAnnotation(javax.persistence.OneToOne.class);
+                if (oneToOneAnnotation != null)
+                    return oneToOneAnnotation.orphanRemoval();
+            }
+        }
+        catch (Exception ex) {}
+        return false;
+    }
+    
+//    private Class getEntityClassFromRepository(Object repository) {
+//        
+//        ParameterizedType name = (java.lang.reflect.ParameterizedType)((Class)repository.getClass().getGenericInterfaces()[0]).getGenericInterfaces()[0];
+//        Type actualTypeArgument = name.getActualTypeArguments()[0];
+//    }
+    
 }

@@ -2,7 +2,8 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
-import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
+import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
+import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import java.util.Arrays;
@@ -81,7 +82,7 @@ public class RestControllerInterceptorEngine {
         return res;
     }
 
-    public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
+    public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
         log.info(String.format("find %s interceptors on %s...", "beforeCreateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
@@ -94,7 +95,7 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
+    public Object executebeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
         log.info(String.format("find %s interceptors on %s...", "beforeUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
@@ -106,7 +107,7 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, RollBackInterceptorException, EntityReflectionException {
+    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
         log.info(String.format("find %s interceptors on %s...", "beforeDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {

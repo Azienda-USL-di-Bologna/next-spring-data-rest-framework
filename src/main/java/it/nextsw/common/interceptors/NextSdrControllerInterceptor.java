@@ -2,7 +2,8 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.annotations.NextSdrInterceptor;
-import it.nextsw.common.interceptors.exceptions.RollBackInterceptorException;
+import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
+import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import java.util.Collection;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -59,9 +60,9 @@ public interface NextSdrControllerInterceptor {
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
-     * @throws RollBackInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
+     * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException;
+    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di update di un'entità
@@ -69,16 +70,17 @@ public interface NextSdrControllerInterceptor {
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
-     * @throws RollBackInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
+     * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object beforeUpdateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException;
+    public Object beforeUpdateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di delete di un'entità
      * @param entity l'entità che sta per essere cancellata (delete)
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
-     * @throws RollBackInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
+     * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
+     * @throws it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException se viene lanciata questa eccezione la transazione prosegue, ma l'oggetto non viene eliminato
      */
-    public void beforeDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws RollBackInterceptorException;
+    public void beforeDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException, SkipDeleteInterceptorException;
 }
