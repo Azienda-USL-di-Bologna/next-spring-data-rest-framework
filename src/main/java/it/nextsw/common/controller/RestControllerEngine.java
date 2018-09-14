@@ -143,24 +143,23 @@ public abstract class RestControllerEngine {
      * Inserimento di una nuova entity
      *
      * @param data - dati grezzi passati nella richiesta
-     * @param entityClass - classe dell'entità
      * @param request
      * @param additionalData
      * @return
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    protected Object insert(Map<String, Object> data, Class entityClass, HttpServletRequest request, String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
+    protected Object insert(Map<String, Object> data, HttpServletRequest request, String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         // istanziazione del repository corretto
-        JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
+        JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);        
+        Class entityClass = entityReflectionUtils.getEntityClassFromRepository(generalRepository);
         try {
             /**
              * costruzione dell'oggetto entity a partire dalla mappa dei dati
              * "grezzi" espressi in (chiave-valore) passati nella richiesta
              * attraverso fasterxml.jackson
              */
-
             Object entity = objectMapper.convertValue(data, entityClass);
             boolean inserting = true;
 

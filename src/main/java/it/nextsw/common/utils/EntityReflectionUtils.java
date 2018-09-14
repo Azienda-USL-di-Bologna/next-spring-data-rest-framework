@@ -2,6 +2,7 @@ package it.nextsw.common.utils;
 
 import com.google.common.base.CaseFormat;
 import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
@@ -244,11 +245,29 @@ public class EntityReflectionUtils {
         catch (Exception ex) {}
         return false;
     }
-    
-//    private Class getEntityClassFromRepository(Object repository) {
-//        
-//        ParameterizedType name = (java.lang.reflect.ParameterizedType)((Class)repository.getClass().getGenericInterfaces()[0]).getGenericInterfaces()[0];
-//        Type actualTypeArgument = name.getActualTypeArguments()[0];
-//    }
+
+    /**
+     * Torna l'entità alla quale il repository fa riferimento. 
+     * Il repository deve estendere la classe NextSdrQueryDslRepository.
+     * @param repository
+     * @return l'entità alla quale il repository fa riferimento, null se l'entità non viene trovata.
+     */
+    public Class getEntityClassFromRepository(Object repository) {
+        Type[] genericInterfaces = repository.getClass().getGenericInterfaces();
+        for (Type type : genericInterfaces) {
+            if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) type)) {
+                Class<NextSdrQueryDslRepository> repositoyInterface = (Class<NextSdrQueryDslRepository>) type;
+                Type[] exendendInterfaces = repositoyInterface.getGenericInterfaces();
+                for (Type exendendInterface : exendendInterfaces) {
+                    ParameterizedType exendendInterfaceParametrized = (ParameterizedType) exendendInterface;
+                    if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) exendendInterfaceParametrized.getRawType())) {
+                        Class entityType = (Class) exendendInterfaceParametrized.getActualTypeArguments()[0];
+                        return entityType;
+                    }
+                }
+            }
+        }
+        return  null;
+    }
     
 }
