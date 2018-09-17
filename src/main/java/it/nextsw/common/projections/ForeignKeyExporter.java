@@ -2,6 +2,10 @@ package it.nextsw.common.projections;
 
 import com.google.common.base.CaseFormat;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
+import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
+import it.nextsw.common.repositories.StringOperation;
+import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
@@ -17,8 +21,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.env.Environment;
 
 /**
  *
@@ -32,25 +40,56 @@ public class ForeignKeyExporter {
 
     @Autowired
     CommonUtils commonUtils;
-
-    @Value("${custom.mapping.url.root}")
-    String customMappingBasePath;
-
-    private String buildBaseUrl(String entityName) {
+    
+    @Autowired
+    private Environment env;
+    
+    /**
+     * mappa dei repository
+     */
+    @Autowired
+    @Qualifier(value = "customRepositoryEntityMap")
+    protected Map<String, NextSdrQueryDslRepository> customRepositoryEntityMap;
+    
+    private String buildUrl(Class targetEntityClass) throws ClassNotFoundException {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.
                         currentRequestAttributes()).getRequest();
 
-        String hostName = commonUtils.getHostname(currentRequest);
-        String baseUrl = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + customMappingBasePath + "/" + entityName.toLowerCase();
+        NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
+        NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
 
-        return baseUrl;
+        String baseUrl = resolvePlaceHolder(annotation.baseUrl());
+        String hostName = commonUtils.getHostname(currentRequest);
+        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + baseUrl + "/" + annotation.repositoryPath();
+
+        return url;
+    }
+
+    private String resolvePlaceHolder(String property) {
+        String pattern = "(\\$\\{(.*)\\})";
+        Pattern r = Pattern.compile(pattern);
+        Matcher m = r.matcher(property);
+        String value = null;
+        if (m.find()) {
+            System.out.println("Found value: " + m.group(0));
+            try {
+                value = m.group(2);
+            } catch (Exception ex) {
+            }
+        }
+
+        if (value != null) {
+            return env.getProperty(value);
+        } else {
+            return property;
+        }
     }
 
     public ForeignKey toForeignKey(String fieldName, Object SourceEntity) throws ClassNotFoundException, NoSuchFieldException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ServletException, EntityReflectionException {
         Object id = null;
         String targetEntityName = null;
-        String url = null;
+        String fullUrl = null;
 
         // esempio idAzienda
         Field field = entityReflectionUtils.getEntityFromProxyObject(SourceEntity).getDeclaredField(fieldName);
@@ -85,7 +124,7 @@ public class ForeignKeyExporter {
                 Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
                 id = primaryKeyGetMethod.invoke(SourceEntity);
                 targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                url = String.format("%s?%s.%s=%s", buildBaseUrl(targetEntityName), filterFieldName, primaryKeyField.getName(), id);
+                fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");
@@ -105,11 +144,11 @@ public class ForeignKeyExporter {
             // se ha un valore l'oggetto, allora si va a calcolare l'id, invocando getId() su azienda
             if (fkEntity != null) {
                 id = fkPrimaryKeyGetMethod.invoke(fkEntity);
-                url = String.format("%s/%s", buildBaseUrl(targetEntityName), id);
+                fullUrl = String.format("%s/%s", buildUrl(entityClass), id);
             }
         }
 
-        ForeignKey fk = new ForeignKey(id, targetEntityName, url);
+        ForeignKey fk = new ForeignKey(id, targetEntityName, fullUrl);
         return fk;
     }
 }

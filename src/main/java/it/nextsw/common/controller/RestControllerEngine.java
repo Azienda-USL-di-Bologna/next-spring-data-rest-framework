@@ -93,8 +93,8 @@ public abstract class RestControllerEngine {
      * mappa dei repository
      */
     @Autowired
-    @Qualifier(value = "customRepositoryMap")
-    protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
+    @Qualifier(value = "customRepositoryPathMap")
+    protected Map<String, NextSdrQueryDslRepository> customRepositoryPathMap;
 
     /**
      * mappa delle projections
@@ -152,7 +152,7 @@ public abstract class RestControllerEngine {
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         // istanziazione del repository corretto
         JpaRepository generalRepository = (JpaRepository) getGeneralRepository(request);
-        Class entityClass = entityReflectionUtils.getEntityClassFromRepository(generalRepository);
+        Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
         try {
             /**
              * costruzione dell'oggetto entity a partire dalla mappa dei dati
@@ -641,7 +641,7 @@ public abstract class RestControllerEngine {
             repositoryKey = repositoryKey.substring(0, slashPos);
         }
 
-        NextSdrQueryDslRepository generalRepository = customRepositoryMap.get(repositoryKey);
+        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
         return generalRepository;
     }
 

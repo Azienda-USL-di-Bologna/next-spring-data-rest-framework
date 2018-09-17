@@ -170,18 +170,19 @@ public class EntityReflectionUtils {
 
     /**
      *
+     * @param <T>
      * @param objectClass
      * @param annotationClass
      * @return
      */
-    public static Annotation getFirstAnnotationOverHierarchy(Class objectClass, Class annotationClass) throws ClassNotFoundException {
+    public static <T extends Annotation> T getFirstAnnotationOverHierarchy(Class objectClass, Class<T> annotationClass) throws ClassNotFoundException {
         AnnotatedType[] annotatedInterfaces = objectClass.getAnnotatedInterfaces();
         for (AnnotatedType annotatedType : annotatedInterfaces) {
                 objectClass = (Class) annotatedType.getType();
             do {
                 Annotation annotation = objectClass.getAnnotation(annotationClass);
                 if (annotation != null) {
-                    return annotation;
+                    return (T) annotation;
                 } else {
                     objectClass = objectClass.getSuperclass();
                 }
@@ -252,7 +253,7 @@ public class EntityReflectionUtils {
      * @param repository
      * @return l'entità alla quale il repository fa riferimento, null se l'entità non viene trovata.
      */
-    public Class getEntityClassFromRepository(Object repository) {
+    public static Class getEntityClassFromRepository(Object repository) {
         Type[] genericInterfaces = repository.getClass().getGenericInterfaces();
         for (Type type : genericInterfaces) {
             if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) type)) {
@@ -269,5 +270,4 @@ public class EntityReflectionUtils {
         }
         return  null;
     }
-    
 }

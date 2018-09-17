@@ -38,8 +38,8 @@ public class ProjectionsInterceptorLauncher {
      * mappa dei repository
      */
     @Autowired
-    @Qualifier(value = "customRepositoryMap")
-    protected Map<String, NextSdrQueryDslRepository> customRepositoryMap;
+    @Qualifier(value = "customRepositoryEntityMap")
+    protected Map<String, NextSdrQueryDslRepository> customRepositoryEntityMap;
     
     /**
      * mappa delle projections
@@ -117,7 +117,7 @@ public class ProjectionsInterceptorLauncher {
                 get(entityReflectionUtils.getPrimaryKeyField((Class) entityFromProxyClass).getName()).eq(id);
 
         // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco NextSdrQueryDslRepository perché tutti i repositories la estendono.
-        NextSdrQueryDslRepository repo = customRepositoryMap.get(entityFromProxyClass.getSimpleName().toLowerCase());
+        NextSdrQueryDslRepository repo = customRepositoryEntityMap.get(entityFromProxyClass.getCanonicalName());
 
         // controllo se è stato implementato un interceptor before select
 //        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityFromProxyClass);
@@ -190,7 +190,7 @@ public class ProjectionsInterceptorLauncher {
         Class returnType = (Class) ((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0];
         String returnTypeEntityName = returnType.getSimpleName();
 
-        NextSdrQueryDslRepository repo = customRepositoryMap.get(returnTypeEntityName.toLowerCase());
+        NextSdrQueryDslRepository repo = customRepositoryEntityMap.get(returnType.getCanonicalName());
         
         String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, methodName.substring(3)); // Dal nome del metodo ricavo il nome del campo che sto espdandendo es. UtenteStrutturaSet
 

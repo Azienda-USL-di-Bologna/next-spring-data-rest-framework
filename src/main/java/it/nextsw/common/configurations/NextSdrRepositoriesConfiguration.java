@@ -29,8 +29,8 @@ public class NextSdrRepositoriesConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(NextSdrRepositoriesConfiguration.class);
 
-    @Bean(name = "customRepositoryMap")
-    public Map<String, NextSdrQueryDslRepository> customRepositoryMap() throws ClassNotFoundException, IOException {
+    @Bean(name = "customRepositoryPathMap")
+    public Map<String, NextSdrQueryDslRepository> customRepositoryPathMap() throws ClassNotFoundException, IOException {
         Map<String, NextSdrQueryDslRepository> repositories = new HashMap();
         List<Object> repositoriesList = applicationContext.getBeansWithAnnotation(NextSdrRepository.class)
                 .values().stream().collect(Collectors.toList());
@@ -41,6 +41,22 @@ public class NextSdrRepositoriesConfiguration {
                         repository.getClass().getName(), NextSdrQueryDslRepository.class.getName()));
             }
             repositories.put(nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
+        }
+        return repositories;
+    }
+    
+    @Bean(name = "customRepositoryEntityMap")
+    public Map<String, NextSdrQueryDslRepository> customRepositoryEntityMap() throws ClassNotFoundException, IOException {
+        Map<String, NextSdrQueryDslRepository> repositories = new HashMap();
+        List<Object> repositoriesList = applicationContext.getBeansWithAnnotation(NextSdrRepository.class)
+                .values().stream().collect(Collectors.toList());
+        for (Object repository: repositoriesList){
+            if (!NextSdrQueryDslRepository.class.isAssignableFrom(repository.getClass())){
+                throw new RuntimeException(String.format("La classe repository %s non estende l'interfaccia %s ",
+                        repository.getClass().getName(), NextSdrQueryDslRepository.class.getName()));
+            }
+            Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(repository);
+            repositories.put(entityClass.getCanonicalName(), (NextSdrQueryDslRepository) repository);
         }
         return repositories;
     }

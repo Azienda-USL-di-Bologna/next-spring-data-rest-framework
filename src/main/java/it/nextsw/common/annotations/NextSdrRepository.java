@@ -23,6 +23,12 @@ public @interface NextSdrRepository {
     public String repositoryPath();
 
     /**
+     * 
+     * @return 
+     */
+    public String baseUrl() default "ciao";
+    
+    /**
      * Definisce la projection di default che il repository utilizzerà;
      * questa viene ignorata se la projection viene passata come parametro nella richiesta
      * @return
