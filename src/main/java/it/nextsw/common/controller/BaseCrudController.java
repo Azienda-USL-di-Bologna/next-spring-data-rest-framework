@@ -26,22 +26,23 @@ import org.springframework.web.bind.annotation.RequestParam;
  * @author gdm
  */
 public abstract class BaseCrudController extends RestControllerEngine {
+
     private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
-    
+
     @RequestMapping(value = {"*"}, method = {RequestMethod.POST, RequestMethod.PUT})
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> insert(
+    protected ResponseEntity<?> insertResource(
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
-        Object entity = insert(data, request, additionalData);
+        Object entity = super.insert(data, request, additionalData);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
     @RequestMapping(value = {"*/{id}"}, method = RequestMethod.PATCH)
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> update(
+    protected ResponseEntity<?> updateResource(
             @PathVariable(required = true) String id,
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
@@ -50,38 +51,37 @@ public abstract class BaseCrudController extends RestControllerEngine {
         try {
             Object update = super.update(id, data, request, additionalData);
             return new ResponseEntity(update, HttpStatus.OK);
-        }
-        catch (NotFoundResourceException ex) {
+        } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
         }
     }
 
     @RequestMapping(value = {"*/{id}"}, method = RequestMethod.DELETE)
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> delete(
+    protected ResponseEntity<?> deleteResource(
             @PathVariable(required = true) String id,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
         log.info("executing delete operation...");
-        Object entity = get(id, request);
-        if (entity != null) {
-            delete(entity, request, additionalData);
+
+        try {
+            super.delete(id, request, additionalData);
             return new ResponseEntity(HttpStatus.OK);
+        } catch (NotFoundResourceException ex) {
+            return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity(HttpStatus.NOT_FOUND);
     }
-    
+
     @RequestMapping(value = {"batch"}, method = RequestMethod.POST)
     @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> batch(
+    protected ResponseEntity<?> batchResources(
             @PathVariable(required = true) String id,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing batch operation...");
-        
+
         return new ResponseEntity(HttpStatus.OK);
-        
-        
+
     }
 }

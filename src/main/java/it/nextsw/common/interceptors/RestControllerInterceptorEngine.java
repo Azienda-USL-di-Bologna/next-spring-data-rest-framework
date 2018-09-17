@@ -16,31 +16,24 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Questa è la classe registro che si occupa di smistare le richieste agli {@link NextSdrControllerInterceptor}
- * adeguati, ovvero che dichiarano come {@link NextSdrControllerInterceptor#getTargetEntityClass()} la classe della richiesta
+ * Questa è la classe registro che si occupa di smistare le richieste agli
+ * {@link NextSdrControllerInterceptor} adeguati, ovvero che dichiarano come
+ * {@link NextSdrControllerInterceptor#getTargetEntityClass()} la classe della
+ * richiesta
  */
 @Component
 public class RestControllerInterceptorEngine {
-    
+
     private static final Logger log = LoggerFactory.getLogger(RestControllerInterceptorEngine.class);
 
-//    @Value(value = "${common.configuration.interceptors-package:it.bologna.ausl.shalbo.interceptors}")
-//    private String interceptorsPackage;
-//
-//    @Autowired
-//    private ListableBeanFactory beanFactory;
-//    
     @Autowired
     private EntityReflectionUtils entityReflectionUtils;
-    
 
     @Autowired
     @Qualifier(value = "interceptorsMap")
     protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
-    
 
     public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, EntityReflectionException {
 //        fillInterceptorsCache();
@@ -124,9 +117,11 @@ public class RestControllerInterceptorEngine {
     }
 
     /**
-     * torna "true" se per la classe Entità passata è implementato almeno un beforeSelectQueryInterceptor
+     * torna "true" se per la classe Entità passata è implementato almeno un
+     * beforeSelectQueryInterceptor
+     *
      * @param entityClass
-     * @return 
+     * @return
      */
     public boolean isImplementedBeforeQueryInterceptor(Class entityClass) {
         List<NextSdrControllerInterceptor> interceptors = interceptorsMap.get(entityClass.getName());
