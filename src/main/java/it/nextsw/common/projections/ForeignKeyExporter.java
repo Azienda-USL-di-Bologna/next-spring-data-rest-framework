@@ -68,7 +68,6 @@ public class ForeignKeyExporter {
         Matcher m = r.matcher(property);
         String value = null;
         if (m.find()) {
-            System.out.println("Found value: " + m.group(0));
             try {
                 value = m.group(2);
             } catch (Exception ex) {
