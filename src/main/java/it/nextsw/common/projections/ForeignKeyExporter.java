@@ -4,13 +4,10 @@ import com.google.common.base.CaseFormat;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
-import it.nextsw.common.repositories.StringOperation;
-import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -21,7 +18,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,17 +36,17 @@ public class ForeignKeyExporter {
 
     @Autowired
     CommonUtils commonUtils;
-    
+
     @Autowired
     private Environment env;
-    
+
     /**
      * mappa dei repository
      */
     @Autowired
     @Qualifier(value = "customRepositoryEntityMap")
     protected Map<String, NextSdrQueryDslRepository> customRepositoryEntityMap;
-    
+
     private String buildUrl(Class targetEntityClass) throws ClassNotFoundException {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.

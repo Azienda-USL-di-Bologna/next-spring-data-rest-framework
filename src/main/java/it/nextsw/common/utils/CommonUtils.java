@@ -31,10 +31,10 @@ public class CommonUtils {
             res = request.getServerName();
         }
 
-        if ("localhost".equals(res)) {
-            res = defaultAziendaPath;
-        }
-
+// TODO: avevamo inserito per un motivo, ma non ce lo ricordiamo più, per cui lo commentiamo
+//        if ("localhost".equals(res)) {
+//            res = defaultAziendaPath;
+//        }
         return res;
     }
 }
