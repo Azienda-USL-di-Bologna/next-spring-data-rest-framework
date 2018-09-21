@@ -1,13 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package it.nextsw.common.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -30,26 +27,26 @@ public abstract class BaseCrudController extends RestControllerEngine {
     private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
 
     @RequestMapping(value = {"*"}, method = {RequestMethod.POST, RequestMethod.PUT})
-    @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> insertResource(
+    @Transactional(rollbackFor = {Throwable.class})
+    public ResponseEntity<?> insertResource(
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
-        Object entity = super.insert(data, request, additionalData);
+        Object entity = super.insert(data, request, parseAdditionalDataIntoMap(additionalData), null, false);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
     @RequestMapping(value = {"*/{id}"}, method = RequestMethod.PATCH)
-    @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> updateResource(
-            @PathVariable(required = true) String id,
+    @Transactional(rollbackFor = {Throwable.class})
+    public ResponseEntity<?> updateResource(
+            @PathVariable(required = true) Object id,
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException {
         log.info("executing update operation...");
         try {
-            Object update = super.update(id, data, request, additionalData);
+            Object update = super.update(id, data, request, parseAdditionalDataIntoMap(additionalData), null, false);
             return new ResponseEntity(update, HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -57,16 +54,18 @@ public abstract class BaseCrudController extends RestControllerEngine {
     }
 
     @RequestMapping(value = {"*/{id}"}, method = RequestMethod.DELETE)
-    @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> deleteResource(
-            @PathVariable(required = true) String id,
+    @Transactional(rollbackFor = {Throwable.class})
+    public ResponseEntity<?> deleteResource(
+            @PathVariable(required = true) Object id,
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
         log.info("executing delete operation...");
 
         try {
-            super.delete(id, request, additionalData);
+            super.delete(id, request, parseAdditionalDataIntoMap(additionalData), null, false);
+            if (true)
+            throw new AbortSaveInterceptorException("aaaa");
             return new ResponseEntity(HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -74,14 +73,18 @@ public abstract class BaseCrudController extends RestControllerEngine {
     }
 
     @RequestMapping(value = {"batch"}, method = RequestMethod.POST)
-    @Transactional(rollbackFor = {Error.class, Exception.class})
-    protected ResponseEntity<?> batchResources(
-            @PathVariable(required = true) String id,
+    @Transactional(rollbackFor = {Throwable.class})
+    public void batchResources(
+            @RequestBody List<BatchOperation> data,
             HttpServletRequest request,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
-        log.info("executing batch operation...");
-
-        return new ResponseEntity(HttpStatus.OK);
-
+            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
+        try {
+            log.info("executing batch operation...");
+            batch(data, request, additionalData);
+//            return new ResponseEntity(HttpStatus.OK);
+        }
+        catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
+            throw ex;
+        }
     }
 }

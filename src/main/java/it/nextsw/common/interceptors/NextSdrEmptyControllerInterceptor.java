@@ -35,7 +35,7 @@ public abstract class NextSdrEmptyControllerInterceptor implements NextSdrContro
     }
 
     @Override
-    public Object beforeUpdateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException {
+    public Object beforeUpdateEntityInterceptor(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException {
         return entity;
     }
 
