@@ -2,6 +2,7 @@ package it.nextsw.common.configurations;
 
 import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
+import it.nextsw.common.utils.CommonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +27,9 @@ public class NextSdrRepositoriesConfiguration {
 
     @Autowired
     private ApplicationContext applicationContext;
+    
+    @Autowired
+    private CommonUtils commonUtils;
 
     private static final Logger log = LoggerFactory.getLogger(NextSdrRepositoriesConfiguration.class);
 
@@ -40,7 +44,8 @@ public class NextSdrRepositoriesConfiguration {
                 throw new RuntimeException(String.format("La classe repository %s non estende l'interfaccia %s ",
                         repository.getClass().getName(), NextSdrQueryDslRepository.class.getName()));
             }
-            repositories.put(nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
+//            repositories.put(nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
+            repositories.put(commonUtils.resolvePlaceHolder(nextSdrRepositoryAnnotation.baseUrl()) + "/" + nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
         }
         return repositories;
     }

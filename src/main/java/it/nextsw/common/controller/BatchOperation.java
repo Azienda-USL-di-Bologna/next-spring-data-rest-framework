@@ -43,6 +43,8 @@ public class BatchOperation {
     }
 
     public String getEntityPath() {
+        if (!entityPath.startsWith("/"))
+            entityPath = "/" + entityPath;
         return entityPath;
     }
 

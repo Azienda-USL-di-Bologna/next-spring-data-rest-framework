@@ -37,9 +37,6 @@ public class ForeignKeyExporter {
     @Autowired
     CommonUtils commonUtils;
 
-    @Autowired
-    private Environment env;
-
     /**
      * mappa dei repository
      */
@@ -55,30 +52,11 @@ public class ForeignKeyExporter {
         NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
         NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
 
-        String baseUrl = resolvePlaceHolder(annotation.baseUrl());
+        String baseUrl = commonUtils.resolvePlaceHolder(annotation.baseUrl());
         String hostName = commonUtils.getHostname(currentRequest);
         String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + baseUrl + "/" + annotation.repositoryPath();
 
         return url;
-    }
-
-    private String resolvePlaceHolder(String property) {
-        String pattern = "(\\$\\{(.*)\\})";
-        Pattern r = Pattern.compile(pattern);
-        Matcher m = r.matcher(property);
-        String value = null;
-        if (m.find()) {
-            try {
-                value = m.group(2);
-            } catch (Exception ex) {
-            }
-        }
-
-        if (value != null) {
-            return env.getProperty(value);
-        } else {
-            return property;
-        }
     }
 
     public ForeignKey toForeignKey(String fieldName, Object SourceEntity) throws ClassNotFoundException, NoSuchFieldException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ServletException, EntityReflectionException {

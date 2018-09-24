@@ -1,9 +1,13 @@
 package it.nextsw.common.utils;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -15,9 +19,12 @@ import org.springframework.util.StringUtils;
 public class CommonUtils {
 
     private static final Logger log = LoggerFactory.getLogger(CommonUtils.class);
-
-    @Value("${nextsdr.request.default.azienda-path:localhost}")
-    private String defaultAziendaPath;
+//
+//    @Value("${nextsdr.request.default.azienda-path:localhost}")
+//    private String defaultAziendaPath;
+//    
+    @Autowired
+    private Environment env;
 
     public String getHostname(HttpServletRequest request) {
 
@@ -31,5 +38,24 @@ public class CommonUtils {
             res = request.getServerName();
         }
         return res;
+    }
+    
+    public String resolvePlaceHolder(String property) {
+        String pattern = "(\\$\\{(.*)\\})";
+        Pattern r = Pattern.compile(pattern);
+        Matcher m = r.matcher(property);
+        String value = null;
+        if (m.find()) {
+            try {
+                value = m.group(2);
+            } catch (Exception ex) {
+            }
+        }
+
+        if (value != null) {
+            return env.getProperty(value);
+        } else {
+            return property;
+        }
     }
 }

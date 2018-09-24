@@ -64,8 +64,6 @@ public abstract class BaseCrudController extends RestControllerEngine {
 
         try {
             super.delete(id, request, parseAdditionalDataIntoMap(additionalData), null, false);
-            if (true)
-            throw new AbortSaveInterceptorException("aaaa");
             return new ResponseEntity(HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -76,11 +74,10 @@ public abstract class BaseCrudController extends RestControllerEngine {
     @Transactional(rollbackFor = {Throwable.class})
     public void batchResources(
             @RequestBody List<BatchOperation> data,
-            HttpServletRequest request,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
+            HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
         try {
             log.info("executing batch operation...");
-            batch(data, request, additionalData);
+            batch(data, request);
 //            return new ResponseEntity(HttpStatus.OK);
         }
         catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
