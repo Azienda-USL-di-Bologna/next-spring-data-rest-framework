@@ -2,6 +2,7 @@ package it.nextsw.common.utils;
 
 import com.google.common.base.CaseFormat;
 import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -167,18 +170,19 @@ public class EntityReflectionUtils {
 
     /**
      *
+     * @param <T>
      * @param objectClass
      * @param annotationClass
      * @return
      */
-    public static Annotation getFirstAnnotationOverHierarchy(Class objectClass, Class annotationClass) throws ClassNotFoundException {
+    public static <T extends Annotation> T getFirstAnnotationOverHierarchy(Class objectClass, Class<T> annotationClass) throws ClassNotFoundException {
         AnnotatedType[] annotatedInterfaces = objectClass.getAnnotatedInterfaces();
         for (AnnotatedType annotatedType : annotatedInterfaces) {
                 objectClass = (Class) annotatedType.getType();
             do {
                 Annotation annotation = objectClass.getAnnotation(annotationClass);
                 if (annotation != null) {
-                    return annotation;
+                    return (T) annotation;
                 } else {
                     objectClass = objectClass.getSuperclass();
                 }
@@ -220,5 +224,50 @@ public class EntityReflectionUtils {
             }
         }
         return filterFieldName;
+    }
+
+    /**
+     * Torna "true" se il campo dell'entità passato ha settato orphanRemoval = true sull'annotazione OneToMany o OneToOne
+     * "false" in tutti gli altri casi o se c'è un qualsiasi errore
+     * @param entityField il campo FK dell'entità
+     * @return 
+     */
+    public boolean hasOrphanRemoval(Field entityField) {
+        try {
+            OneToMany oneToManyAnnotation = entityField.getAnnotation(javax.persistence.OneToMany.class);
+            if (oneToManyAnnotation != null)
+                return oneToManyAnnotation.orphanRemoval();
+            else {
+                OneToOne oneToOneAnnotation = entityField.getAnnotation(javax.persistence.OneToOne.class);
+                if (oneToOneAnnotation != null)
+                    return oneToOneAnnotation.orphanRemoval();
+            }
+        }
+        catch (Exception ex) {}
+        return false;
+    }
+
+    /**
+     * Torna l'entità alla quale il repository fa riferimento. 
+     * Il repository deve estendere la classe NextSdrQueryDslRepository.
+     * @param repository
+     * @return l'entità alla quale il repository fa riferimento, null se l'entità non viene trovata.
+     */
+    public static Class getEntityClassFromRepository(Object repository) {
+        Type[] genericInterfaces = repository.getClass().getGenericInterfaces();
+        for (Type type : genericInterfaces) {
+            if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) type)) {
+                Class<NextSdrQueryDslRepository> repositoyInterface = (Class<NextSdrQueryDslRepository>) type;
+                Type[] exendendInterfaces = repositoyInterface.getGenericInterfaces();
+                for (Type exendendInterface : exendendInterfaces) {
+                    ParameterizedType exendendInterfaceParametrized = (ParameterizedType) exendendInterface;
+                    if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) exendendInterfaceParametrized.getRawType())) {
+                        Class entityType = (Class) exendendInterfaceParametrized.getActualTypeArguments()[0];
+                        return entityType;
+                    }
+                }
+            }
+        }
+        return  null;
     }
 }

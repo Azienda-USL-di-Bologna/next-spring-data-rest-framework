@@ -78,9 +78,9 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                         DateTimePath dateTimePath = (DateTimePath) path;
                         if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
                             res = dateTimePath.isNull();
-                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))){
+                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
                             res = dateTimePath.isNotNull();
-                        } else {               
+                        } else {
                             dateTimePath = (DateTimePath) path;
                             LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
                             LocalDateTime endDate = startDate.plusDays(1);
@@ -119,19 +119,19 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                         return Optional.of(Expressions.asBoolean(true).isTrue());
                     }
                 });
-        
+
         bindings.bind(Integer.class).all(
                 (Path<Integer> path, Collection<? extends Integer> values) -> {
                     final List<? extends Integer> numbers = new ArrayList<>(values);
                     Predicate res = null;
                     if (values.isEmpty()) {
-                            res = Expressions.asBoolean(true).isTrue();
+                        res = Expressions.asBoolean(true).isTrue();
                     } else if (values.size() == 1) {
-                        // stratagemma per riuscire a filtrare per null. 
+                        // stratagemma per riuscire a filtrare per null.
                         // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null
-                        if (numbers.get(0) == 999999999){
-                                NumberPath integerPath = (NumberPath) path;
-                                res = integerPath.isNull();
+                        if (numbers.get(0) == 999999999) {
+                            NumberPath integerPath = (NumberPath) path;
+                            res = integerPath.isNull();
                         } else {
                             NumberPath integerPath = (NumberPath) path;
                             res = integerPath.eq(numbers.get(0));
@@ -162,7 +162,6 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         Matcher m = r.matcher(valueToParse);
 
         if (m.find()) {
-            System.out.println("Found value: " + m.group(0));
             try {
                 String operation = m.group(1);
                 String value = m.group(2);
