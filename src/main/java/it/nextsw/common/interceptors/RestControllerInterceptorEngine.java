@@ -1,6 +1,7 @@
 package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
+import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
@@ -35,7 +36,7 @@ public class RestControllerInterceptorEngine {
     @Qualifier(value = "interceptorsMap")
     protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
 
-    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, EntityReflectionException {
+    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws AbortLoadInterceptorException, ClassNotFoundException, EntityReflectionException {
 //        fillInterceptorsCache();
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
@@ -46,7 +47,7 @@ public class RestControllerInterceptorEngine {
         return initialPredicate;
     }
 
-    public Object executeAfterSelectQueryInterceptor(Object entity, Collection<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, InterceptorException, EntityReflectionException {
+    public Object executeAfterSelectQueryInterceptor(Object entity, Collection<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws AbortLoadInterceptorException, ClassNotFoundException, InterceptorException, EntityReflectionException {
 
         Object res = null;
 
