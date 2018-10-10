@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,9 @@ public class RestControllerInterceptorEngine {
 
     @Autowired
     private EntityReflectionUtils entityReflectionUtils;
+
+    @PersistenceContext
+    EntityManager em;
 
     @Autowired
     @Qualifier(value = "interceptorsMap")
@@ -67,12 +72,19 @@ public class RestControllerInterceptorEngine {
                 if (entity != null) {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
+                    em.detach(entity);
                 } else {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entities.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
+                    if (entities != null) {
+                        for (Object e : entities) {
+                            em.detach(e);
+                        }
+                    }
                 }
             }
         }
+
         return res;
     }
 
