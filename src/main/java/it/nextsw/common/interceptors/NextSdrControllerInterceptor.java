@@ -2,6 +2,7 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.annotations.NextSdrInterceptor;
+import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import java.util.Collection;
@@ -14,7 +15,6 @@ import javax.servlet.http.HttpServletRequest;
  *  {@link org.springframework.core.annotation.Order} per definire l'ordine con cui devono essere eseguiti
  */
 public interface NextSdrControllerInterceptor {
-
 
     public final String BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "beforeSelectQueryInterceptor";
     public final String AFTER_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "afterSelectQueryInterceptor";
@@ -31,28 +31,29 @@ public interface NextSdrControllerInterceptor {
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @return il predicato da utilizzare per eseguire la query
+     * @throws AbortLoadInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request);
+    public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request) throws AbortLoadInterceptorException;
 
     /**
-     * Questo metodo viene eseguito subito dopo la query nel caso la query torni più di un risultato.
-     * In questo metodo è possibile fare un post filtraggio sui risultati
+     * Questo metodo viene eseguito subito dopo la query nel caso la query torni più di un risultato.In questo metodo è possibile fare un post filtraggio sui risultati
      * @param entities la lista di entità risultante dalla query eseguita
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @return la collection di oggetti che verrano ritornati al richiedente
+     * @throws AbortLoadInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Collection<Object> afterSelectQueryInterceptor(Collection<Object> entities, Map<String, String> additionalData, HttpServletRequest request);
+    public Collection<Object> afterSelectQueryInterceptor(Collection<Object> entities, Map<String, String> additionalData, HttpServletRequest request) throws AbortLoadInterceptorException;
 
     /**
-     * Questo metodo viene eseguito subito dopo la query nel caso la query torni un risultato.
-     * In questo metodo è possibile fare un post filtraggio sui risultati
+     * Questo metodo viene eseguito subito dopo la query nel caso la query torni un risultato.In questo metodo è possibile fare un post filtraggio sui risultati
      * @param entity l' entità risultante dalla query eseguita
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @return l'oggetto che verrà ritornato al richiedente
+     * @throws AbortLoadInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object afterSelectQueryInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request);
+    public Object afterSelectQueryInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortLoadInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di insert di un'entità

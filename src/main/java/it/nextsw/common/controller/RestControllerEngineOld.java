@@ -15,8 +15,8 @@ import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
-import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
+import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
@@ -47,7 +47,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -123,11 +122,12 @@ public abstract class RestControllerEngineOld {
         Object res = null;
         try {
             JpaRepository generalRepository;
-            if (StringUtils.hasText(entityPath))
+            if (StringUtils.hasText(entityPath)) {
                 generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
-            else
+            } else {
                 generalRepository = (JpaRepository) getGeneralRepository(request);
-            
+            }
+
             Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
             Class<?> pkType = entityReflectionUtils.getPrimaryKeyField(entityClass).getType();
 
@@ -153,16 +153,16 @@ public abstract class RestControllerEngineOld {
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    
     protected Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
-        
+
         // istanziazione del repository corretto
         JpaRepository generalRepository;
-        if (StringUtils.hasText(entityPath))
+        if (StringUtils.hasText(entityPath)) {
             generalRepository = (JpaRepository) this.customRepositoryPathMap.get(entityPath);
-        else
+        } else {
             generalRepository = (JpaRepository) getGeneralRepository(request);
+        }
         Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
         try {
             /**
@@ -475,10 +475,11 @@ public abstract class RestControllerEngineOld {
      */
     protected void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         JpaRepository generalRepository;
-            if (StringUtils.hasText(entityPath))
-                generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
-            else
-                generalRepository = (JpaRepository) getGeneralRepository(request);
+        if (StringUtils.hasText(entityPath)) {
+            generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
+        } else {
+            generalRepository = (JpaRepository) getGeneralRepository(request);
+        }
 
         Object entity = get(id, request, entityPath);
         if (entity == null) {
@@ -525,15 +526,16 @@ public abstract class RestControllerEngineOld {
             manageNestedEntity(res, data, request, additionalData);
 
             JpaRepository generalRepository;
-            if (StringUtils.hasText(entityPath))
+            if (StringUtils.hasText(entityPath)) {
                 generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
-            else
+            } else {
                 generalRepository = (JpaRepository) getGeneralRepository(request);
+            }
 
             restControllerInterceptor.executebeforeUpdateInterceptor(entity, null, request, additionalData);
 
             generalRepository.save(res);
-            
+
             if (!batch) {
                 Class projectionClass = getProjectionClass(null, request);
                 res = factory.createProjection(projectionClass, res);
@@ -677,7 +679,7 @@ public abstract class RestControllerEngineOld {
         }
         return objectMapper.writeValueAsString(data);
     }
-    
+
     protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath().substring(getBaseUrl().length() + 1);
         int slashPos = repositoryKey.indexOf("/");
@@ -710,7 +712,6 @@ public abstract class RestControllerEngineOld {
             return new HashMap<>();
         }
     }
-    
 
     /**
      * Reperimento delle risorse, considerando il caso si richiedano tutti, una
@@ -727,7 +728,7 @@ public abstract class RestControllerEngineOld {
      * @return
      * @throws RestControllerEngineException
      */
-    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException {
+    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
         Class projectionClass;
         /**

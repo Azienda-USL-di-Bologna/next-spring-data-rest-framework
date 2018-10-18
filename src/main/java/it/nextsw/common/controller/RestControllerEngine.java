@@ -16,6 +16,7 @@ import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
+import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
@@ -685,7 +686,7 @@ public abstract class RestControllerEngine {
      */
     protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
-        
+
         if (withId) {
             int slashPos = repositoryKey.lastIndexOf("/");
             if (slashPos != -1) {
@@ -747,7 +748,7 @@ public abstract class RestControllerEngine {
      * @return
      * @throws RestControllerEngineException
      */
-    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException {
+    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
         Class projectionClass;
         /**
@@ -761,7 +762,7 @@ public abstract class RestControllerEngine {
 
         /**
          * Qui serve il repository specifico, ma essendo qui in una funzione generica, tutti i nostri repository estendono
-         * NextSdrQueryDslRepository; così facendo si ha un'interfaccia (quella di repository) che estende un'altra interfaccia (NextSdrQueryDslRepository), 
+         * NextSdrQueryDslRepository; così facendo si ha un'interfaccia (quella di repository) che estende un'altra interfaccia (NextSdrQueryDslRepository),
          * avendo così due tipi disponibili. Così facendo ogni nostro repository è anche di tipo NextSdrQueryDslRepository.
          *
          * Spring ha una mappa dove la chiave ha il nome della classe in lowerCamelcase mentre il valore corrisponde al valore dei repository
