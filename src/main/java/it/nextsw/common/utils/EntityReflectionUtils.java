@@ -6,6 +6,7 @@ import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ReflectionUtils;
 
 import javax.persistence.*;
 import java.lang.annotation.Annotation;
@@ -67,7 +68,7 @@ public class EntityReflectionUtils {
         return res;
     }
 
-    public boolean isForeignKeyField(Field field) {
+    public static boolean isForeignKeyField(Field field) {
         return field.getAnnotation(OneToMany.class) != null
                 || field.getAnnotation(ManyToOne.class) != null
                 || field.getAnnotation(OneToOne.class) != null
@@ -270,4 +271,57 @@ public class EntityReflectionUtils {
         }
         return  null;
     }
+
+    /**
+     * Reperimento del metodo set di un particolare campo, di una particolare classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     */
+    public static Method getSetMethod(Class entityClass, String fieldName)  {
+        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName),null);
+        if (result != null)
+            return result;
+        else
+            throw new RuntimeException(String.format("metodo set per il campo %s non trovato", fieldName));
+    }
+
+    /**
+     * Reperimento del metodo get di un particolare campo, di una particolare classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     */
+    public static Method getGetMethod(Class entityClass, String fieldName)  {
+
+        Method result = ReflectionUtils.findMethod(entityClass, "get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
+        if (result == null){
+            result = ReflectionUtils.findMethod(entityClass, "is" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
+            if (result!=null)
+                return result;
+            else
+                throw new RuntimeException(String.format("metodo set per il campo %s non trovato", fieldName));
+        } else
+            return result;
+    }
+
+    /**
+     * Il metodo ritorna il field della classe o di una delle sue superclassi
+     *
+     * @param entityClass la classe su cui cercare il field
+     * @param fieldName il nome del field
+     * @return
+     * @throws RuntimeException se non trova nessun field col nome passato
+     */
+
+    public static Field getDeclaredField(Class entityClass, String fieldName) throws RuntimeException {
+        Field result = ReflectionUtils.findField(entityClass, fieldName);
+        if (result != null)
+            return result;
+        else
+            throw new RuntimeException(String.format("Field il campo %s non trovato", fieldName));
+    }
+
 }
