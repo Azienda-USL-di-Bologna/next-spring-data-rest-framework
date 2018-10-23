@@ -641,7 +641,7 @@ public abstract class RestControllerEngineOld {
                     } else {
                         Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
                         Field field = trueEntityClass.getDeclaredField(key);
-                        if (entityReflectionUtils.isForeignKeyField(field)) {
+                        if (EntityReflectionUtils.isForeignKeyField(field)) {
                             /**
                              * caso in cui l'elemento è un entità singola,
                              * richiamo ricorsivamente il merge sull'oggetto.

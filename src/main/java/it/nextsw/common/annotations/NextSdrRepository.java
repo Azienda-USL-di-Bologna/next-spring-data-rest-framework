@@ -29,7 +29,7 @@ public @interface NextSdrRepository {
      *
      * @return
      */
-    public String baseUrl();
+    public String baseUrl() default "";
 
     /**
      * Definisce la projection di default che il repository utilizzerà; questa
