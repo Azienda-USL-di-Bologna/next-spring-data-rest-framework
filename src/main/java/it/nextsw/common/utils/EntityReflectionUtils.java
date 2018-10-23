@@ -302,7 +302,7 @@ public class EntityReflectionUtils {
             if (result!=null)
                 return result;
             else
-                throw new RuntimeException(String.format("metodo set per il campo %s non trovato", fieldName));
+                throw new RuntimeException(String.format("metodo get per il campo %s non trovato", fieldName));
         } else
             return result;
     }
