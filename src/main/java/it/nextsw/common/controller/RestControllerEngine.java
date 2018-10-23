@@ -372,7 +372,7 @@ public abstract class RestControllerEngine {
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod);
 
-                        } else if (EntityReflectionUtils.isForeignKeyField(EntityReflectionUtils.getDeclaredField(entityClass,key))) {
+                        } else if (EntityReflectionUtils.isForeignKeyField(EntityReflectionUtils.getDeclaredField(entityClass, key))) {
                             manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageEnumMerge(entity, value, setMethod);
@@ -382,11 +382,11 @@ public abstract class RestControllerEngine {
                              * base (String o Integer, o forse qualche altro
                              * caso che ora non mi viene in mente)
                              */
-                            setMethod.invoke(entity, value);
+                            manageOtherCasesMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         }
                     } else {
                         // in questo caso ho passato il valore null per settare il campo a null
-                        manageOtherCasesMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
+                        manageNullValueMerge(entity, entityClass, key, request, additionalDataMap, setMethod, getMethod);
                     }
                 }
             }
@@ -394,9 +394,29 @@ public abstract class RestControllerEngine {
         return entity;
     }
 
+
     /**
-     * Gestisce la merge in tutti gli altri casi, essenzialmente chiama l'invoke sul set per settare il value
+     * Gestisce la merge nel caso in cui il campo sia null.
      * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageNullValueMerge(Object entity, Class entityClass, String key, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        setMethod.invoke(entity, null);
+    }
+
+
+    /**
+     * Gestisce la merge in tutti gli altri casi, essenzialmente chiama l'invoke sul set per settare il value.
+     * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
+     *
      * @param entity
      * @param entityClass
      * @param key
@@ -412,21 +432,23 @@ public abstract class RestControllerEngine {
     }
 
 
-        /**
-         * gestione delle enum durante il merge
-         * @param entity
-         * @param value
-         * @param setMethod
-         * @throws IllegalAccessException
-         * @throws InvocationTargetException
-         */
+    /**
+     * gestione delle enum durante il merge
+     *
+     * @param entity
+     * @param value
+     * @param setMethod
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     */
     protected void manageEnumMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
-        value = Enum.valueOf((Class)setMethod.getParameterTypes()[0],(String) value);
+        value = Enum.valueOf((Class) setMethod.getParameterTypes()[0], (String) value);
         setMethod.invoke(entity, value);
     }
 
     /**
      * Gestione delle entità figlie durante il merge
+     *
      * @param entity
      * @param entityClass
      * @param key
@@ -524,6 +546,7 @@ public abstract class RestControllerEngine {
     /**
      * Caso in cui trovo una collection. In questo caso
      * estraggo la Collection dall'entità e ciclo su tutti gli elementi
+     *
      * @param entity
      * @param entityClass
      * @param key
@@ -957,7 +980,6 @@ public abstract class RestControllerEngine {
         }
         return resource;
     }
-
 
 
 }
