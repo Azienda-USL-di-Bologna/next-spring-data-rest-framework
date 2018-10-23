@@ -2,9 +2,11 @@ package it.nextsw.common.utils;
 
 import com.google.common.base.CaseFormat;
 import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ReflectionUtils;
 
 import javax.persistence.*;
 import java.lang.annotation.Annotation;
@@ -66,7 +68,7 @@ public class EntityReflectionUtils {
         return res;
     }
 
-    public boolean isForeignKeyField(Field field) {
+    public static boolean isForeignKeyField(Field field) {
         return field.getAnnotation(OneToMany.class) != null
                 || field.getAnnotation(ManyToOne.class) != null
                 || field.getAnnotation(OneToOne.class) != null
@@ -169,18 +171,19 @@ public class EntityReflectionUtils {
 
     /**
      *
+     * @param <T>
      * @param objectClass
      * @param annotationClass
      * @return
      */
-    public static Annotation getFirstAnnotationOverHierarchy(Class objectClass, Class annotationClass) throws ClassNotFoundException {
+    public static <T extends Annotation> T getFirstAnnotationOverHierarchy(Class objectClass, Class<T> annotationClass) throws ClassNotFoundException {
         AnnotatedType[] annotatedInterfaces = objectClass.getAnnotatedInterfaces();
         for (AnnotatedType annotatedType : annotatedInterfaces) {
                 objectClass = (Class) annotatedType.getType();
             do {
                 Annotation annotation = objectClass.getAnnotation(annotationClass);
                 if (annotation != null) {
-                    return annotation;
+                    return (T) annotation;
                 } else {
                     objectClass = objectClass.getSuperclass();
                 }
@@ -244,11 +247,81 @@ public class EntityReflectionUtils {
         catch (Exception ex) {}
         return false;
     }
-    
-//    private Class getEntityClassFromRepository(Object repository) {
-//        
-//        ParameterizedType name = (java.lang.reflect.ParameterizedType)((Class)repository.getClass().getGenericInterfaces()[0]).getGenericInterfaces()[0];
-//        Type actualTypeArgument = name.getActualTypeArguments()[0];
-//    }
-    
+
+    /**
+     * Torna l'entità alla quale il repository fa riferimento. 
+     * Il repository deve estendere la classe NextSdrQueryDslRepository.
+     * @param repository
+     * @return l'entità alla quale il repository fa riferimento, null se l'entità non viene trovata.
+     */
+    public static Class getEntityClassFromRepository(Object repository) {
+        Type[] genericInterfaces = repository.getClass().getGenericInterfaces();
+        for (Type type : genericInterfaces) {
+            if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) type)) {
+                Class<NextSdrQueryDslRepository> repositoyInterface = (Class<NextSdrQueryDslRepository>) type;
+                Type[] exendendInterfaces = repositoyInterface.getGenericInterfaces();
+                for (Type exendendInterface : exendendInterfaces) {
+                    ParameterizedType exendendInterfaceParametrized = (ParameterizedType) exendendInterface;
+                    if (NextSdrQueryDslRepository.class.isAssignableFrom((Class<?>) exendendInterfaceParametrized.getRawType())) {
+                        Class entityType = (Class) exendendInterfaceParametrized.getActualTypeArguments()[0];
+                        return entityType;
+                    }
+                }
+            }
+        }
+        return  null;
+    }
+
+    /**
+     * Reperimento del metodo set di un particolare campo, di una particolare classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     */
+    public static Method getSetMethod(Class entityClass, String fieldName)  {
+        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName),null);
+        if (result != null)
+            return result;
+        else
+            throw new RuntimeException(String.format("metodo set per il campo %s non trovato", fieldName));
+    }
+
+    /**
+     * Reperimento del metodo get di un particolare campo, di una particolare classe
+     *
+     * @param entityClass
+     * @param fieldName
+     * @return
+     */
+    public static Method getGetMethod(Class entityClass, String fieldName)  {
+
+        Method result = ReflectionUtils.findMethod(entityClass, "get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
+        if (result == null){
+            result = ReflectionUtils.findMethod(entityClass, "is" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName));
+            if (result!=null)
+                return result;
+            else
+                throw new RuntimeException(String.format("metodo get per il campo %s non trovato", fieldName));
+        } else
+            return result;
+    }
+
+    /**
+     * Il metodo ritorna il field della classe o di una delle sue superclassi
+     *
+     * @param entityClass la classe su cui cercare il field
+     * @param fieldName il nome del field
+     * @return
+     * @throws RuntimeException se non trova nessun field col nome passato
+     */
+
+    public static Field getDeclaredField(Class entityClass, String fieldName) throws RuntimeException {
+        Field result = ReflectionUtils.findField(entityClass, fieldName);
+        if (result != null)
+            return result;
+        else
+            throw new RuntimeException(String.format("Field il campo %s non trovato", fieldName));
+    }
+
 }

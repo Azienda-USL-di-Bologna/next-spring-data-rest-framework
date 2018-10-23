@@ -1,6 +1,7 @@
 package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
+import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
@@ -10,39 +11,37 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Questa è la classe registro che si occupa di smistare le richieste agli {@link NextSdrControllerInterceptor}
- * adeguati, ovvero che dichiarano come {@link NextSdrControllerInterceptor#getTargetEntityClass()} la classe della richiesta
+ * Questa è la classe registro che si occupa di smistare le richieste agli
+ * {@link NextSdrControllerInterceptor} adeguati, ovvero che dichiarano come
+ * {@link NextSdrControllerInterceptor#getTargetEntityClass()} la classe della
+ * richiesta
  */
 @Component
 public class RestControllerInterceptorEngine {
-    
+
     private static final Logger log = LoggerFactory.getLogger(RestControllerInterceptorEngine.class);
 
-//    @Value(value = "${common.configuration.interceptors-package:it.bologna.ausl.shalbo.interceptors}")
-//    private String interceptorsPackage;
-//
-//    @Autowired
-//    private ListableBeanFactory beanFactory;
-//    
     @Autowired
     private EntityReflectionUtils entityReflectionUtils;
-    
+
+    @PersistenceContext
+    EntityManager em;
 
     @Autowired
     @Qualifier(value = "interceptorsMap")
     protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
-    
 
-    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, EntityReflectionException {
+    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws AbortLoadInterceptorException, ClassNotFoundException, EntityReflectionException {
 //        fillInterceptorsCache();
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
@@ -53,7 +52,7 @@ public class RestControllerInterceptorEngine {
         return initialPredicate;
     }
 
-    public Object executeAfterSelectQueryInterceptor(Object entity, Collection<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, InterceptorException, EntityReflectionException {
+    public Object executeAfterSelectQueryInterceptor(Object entity, Collection<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws AbortLoadInterceptorException, ClassNotFoundException, InterceptorException, EntityReflectionException {
 
         Object res = null;
 
@@ -73,12 +72,19 @@ public class RestControllerInterceptorEngine {
                 if (entity != null) {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
+                    em.detach(entity);
                 } else {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entities.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
+                    if (entities != null) {
+                        for (Object e : entities) {
+                            em.detach(e);
+                        }
+                    }
                 }
             }
         }
+
         return res;
     }
 
@@ -95,13 +101,13 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executebeforeUpdateInterceptor(Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
         log.info(String.format("find %s interceptors on %s...", "beforeUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(entityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
                 log.info(String.format("execute %s on %s", "beforeUpdateEntityInterceptor", entity.toString()));
-                entity = interceptor.beforeUpdateEntityInterceptor(entity, additionalData, request);
+                entity = interceptor.beforeUpdateEntityInterceptor(entity, beforeUpdateEntity, additionalData, request);
             }
         }
         return entity;
@@ -124,9 +130,11 @@ public class RestControllerInterceptorEngine {
     }
 
     /**
-     * torna "true" se per la classe Entità passata è implementato almeno un beforeSelectQueryInterceptor
+     * torna "true" se per la classe Entità passata è implementato almeno un
+     * beforeSelectQueryInterceptor
+     *
      * @param entityClass
-     * @return 
+     * @return
      */
     public boolean isImplementedBeforeQueryInterceptor(Class entityClass) {
         List<NextSdrControllerInterceptor> interceptors = interceptorsMap.get(entityClass.getName());

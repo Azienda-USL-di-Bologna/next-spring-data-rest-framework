@@ -19,7 +19,7 @@ import org.springframework.data.rest.core.config.Projection;
 @Configuration
 public class NextSdrProjectionsConfiguration {
 
-    @Value("${common.projection.package}")
+    @Value("${nextsdr.projection.package}")
     private String projectionsPackage;
 
     private static final Logger log = LoggerFactory.getLogger(NextSdrProjectionsConfiguration.class);
