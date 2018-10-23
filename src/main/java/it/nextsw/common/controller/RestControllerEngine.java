@@ -409,7 +409,7 @@ public abstract class RestControllerEngine {
      * @throws Exception
      */
     protected void manageNullValueMerge(Object entity, Class entityClass, String key, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        setMethod.invoke(entity, null);
+        setMethod.invoke(entity, (Object) null);
     }
 
 
