@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
@@ -51,9 +50,6 @@ public class ProjectionsInterceptorLauncher {
 
     @Autowired
     private RestControllerInterceptorEngine restControllerInterceptor;
-
-    @Autowired
-    private EntityReflectionUtils entityReflectionUtils;
 
     @Autowired
     protected ProjectionFactory factory;
@@ -102,11 +98,11 @@ public class ProjectionsInterceptorLauncher {
      * @throws InterceptorException
      */
     public Object lanciaInterceptor(Object target, String methodName, Class returnType) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException {
-        Class entityFromProxyClass = entityReflectionUtils.getEntityFromProxyClass(returnType); // Recupero la classe che sto espandendo dalla sua ProxyClass
+        Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(returnType); // Recupero la classe che sto espandendo dalla sua ProxyClass
 
         Method method = target.getClass().getMethod(methodName);    // Recupero il metodo che sto gestendo (quello su cui c'è l'annotazione)
         Object invoke = method.invoke(target);                      // Eseguo il metodo sull'istanza dell'entità di partenza in modo da recuperare l'entità da espandere (In realtà l'esecuzione del metodo non esegue la query ma torna l'istanza dell'entità con popolato solo l'id)
-        Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(invoke); // Dall'oggetto precedente prendo il metodo per recuperare la primaryKey dell'entity che sto espandendo
+        Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(invoke); // Dall'oggetto precedente prendo il metodo per recuperare la primaryKey dell'entity che sto espandendo
         Object id = primaryKeyGetMethod.invoke(invoke);             // Prendo il valore della primaryKey dell'entità che sto espandendo
 
         /* Il PathBuilder mi serve per usare tramite reflection le classi QEntity.
@@ -115,7 +111,7 @@ public class ProjectionsInterceptorLauncher {
          */
         Predicate pred = new PathBuilder(
                 BooleanExpression.class, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, entityFromProxyClass.getSimpleName())).
-                get(entityReflectionUtils.getPrimaryKeyField((Class) entityFromProxyClass).getName()).eq(id);
+                get(EntityReflectionUtils.getPrimaryKeyField((Class) entityFromProxyClass).getName()).eq(id);
 
         // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco NextSdrQueryDslRepository perché tutti i repositories la estendono.
         NextSdrQueryDslRepository repo = customRepositoryEntityMap.get(entityFromProxyClass.getCanonicalName());
@@ -182,7 +178,7 @@ public class ProjectionsInterceptorLauncher {
      * @throws InterceptorException
      */
     public Collection lanciaInterceptorCollection(Object target, String methodName) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
-        Class targetEntityClass = entityReflectionUtils.getEntityFromProxyObject(target);
+        Class targetEntityClass = EntityReflectionUtils.getEntityFromProxyObject(target);
         Method method = targetEntityClass.getMethod(methodName);
         // Come returnType voglio il tipo dell'entità all'interno del Set/List. Per trovarlo bisogna castare a ParameterizedType il risultato di getGenericReturnType() sul metodo trattato.
         Class returnType = (Class) ((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0];
@@ -194,10 +190,10 @@ public class ProjectionsInterceptorLauncher {
 
         Field field = targetEntityClass.getDeclaredField(fieldName);    // Mi prendo il campo che sto espandendo
 
-        String filterFieldName = entityReflectionUtils.getFilterFieldName(field, returnType);  // Il nome del campo che deve usare nel filtro es. idUtente
+        String filterFieldName = EntityReflectionUtils.getFilterFieldName(field, returnType);  // Il nome del campo che deve usare nel filtro es. idUtente
 
-        Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(targetEntityClass); // Questo è il campo della PK, ci serve il suo nome per inserirlo nel calcolo del filtro
-        Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(target);  // Prendo il metodo per ottenere la PK
+        Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(targetEntityClass); // Questo è il campo della PK, ci serve il suo nome per inserirlo nel calcolo del filtro
+        Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(target);  // Prendo il metodo per ottenere la PK
         Object id = primaryKeyGetMethod.invoke(target); // Questo è la PK dell'entity
 
         // Questo predicato corrisponde ad es. a: "QUtenteStruttura.utenteStruttura.idUtente.id.eq(id)"
@@ -207,7 +203,7 @@ public class ProjectionsInterceptorLauncher {
                 get(primaryKeyField.getName()).eq(id);
 
         // controllo se è stato implementato un interceptor before select
-        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityReflectionUtils.getEntityFromProxyClass(returnType));
+        boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(EntityReflectionUtils.getEntityFromProxyClass(returnType));
 
         // se lo è lo eseguo per modificare il predicato
         if (implementedBeforeQueryInterceptor) {
