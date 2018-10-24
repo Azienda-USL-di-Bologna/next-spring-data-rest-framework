@@ -32,12 +32,7 @@ import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -53,6 +48,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.ResourceAssembler;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -352,7 +349,7 @@ public abstract class RestControllerEngine {
              * foreign key, ma usarne una già esistente
              */
             if (key.startsWith("fk_")) {
-               // manageFkMerge(entity, entityClass, key, value);
+                // manageFkMerge(entity, entityClass, key, value);
             } else {
                 /*
                  * se 'entità ha una pk seriale, devo saltare il settaggio dell'id perché:
@@ -422,24 +419,110 @@ public abstract class RestControllerEngine {
          * richiamo ricorsivamente il merge sull'oggetto.
          */
         boolean inserting = false;
+        boolean isModified = false;
         Object childEntity = getMethod.invoke(entity);
         Object beforeUpdateEntity = null;
         if (childEntity == null) {
             inserting = true;
             childEntity = field.getType().newInstance();
         } else {
-            //                                beforeUpdateEntity = objectMapper.convertValue(childEntity, entityReflectionUtils.getEntityFromProxyObject(childEntity));
             beforeUpdateEntity = cloneEntity(childEntity);
+            childEntity = extractCorrectChildEntity(value, childEntity);
         }
 
-
+        isModified = isEntityModified(entity, value);
         childEntity = merge(value, childEntity, request, additionalDataMap);
         if (inserting) {
             childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
-        } else {
-            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
+            if (isModified)
+                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
         }
         setMethod.invoke(entity, childEntity);
+    }
+
+    /**
+     * Il metodo si occupa di ritornare l'esatta childEntity confrontando la childEntity settata sull'entità e
+     * quella proveniente dal JSON. Per esatta si intende la childEntity con l'id presente nel JSON.
+     *
+     * @param value
+     * @param childEntity
+     * @return
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     * @throws NoSuchMethodException
+     */
+    protected Object extractCorrectChildEntity(Map<String, Object> value, Object childEntity) throws Exception {
+        Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntity.getClass()).invoke(childEntity);
+        Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntity.getClass()).getName());
+        // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
+        if (!childEntityPKey.getClass().equals(valuePKey.getClass())) {
+            if (Number.class.isAssignableFrom(childEntityPKey.getClass())) {
+                if (childEntityPKey.getClass().equals(Long.class))
+                    valuePKey = ((Number) valuePKey).longValue();
+            }
+        }
+        // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
+        if (!childEntityPKey.equals(valuePKey)) {
+            childEntity = em.find(childEntity.getClass(), valuePKey);
+        }
+        return childEntity;
+    }
+
+    protected boolean isEntityModified(Object entity, Map<String, Object> values) throws Exception {
+        boolean result = false;
+        for (String key : values.keySet()) {
+            Object value = values.get(key);
+            Object valueEntity = EntityReflectionUtils.getGetMethod(entity.getClass(), key).invoke(entity);
+            // gestiamo casi tipi primitivi e null
+            //if (value != valueEntity || ((value == null && valueEntity != null) || (value != null && valueEntity == null)))
+            if (value != valueEntity)
+                return true;
+            else {
+                Class valueEntityClass = EntityReflectionUtils.getDeclaredField(entity.getClass(), key).getType();
+                if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
+                    return true;
+                if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                    LocalDateTime dateTime;
+                    try {
+                        // giorno e ora
+                        dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                    } catch (Exception ex) {
+                        // solo giorno
+                        //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
+                        dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                    }
+                    if (!dateTime.equals(valueEntity))
+                        return true;
+                }
+                if ((Object[].class).isAssignableFrom(valueEntityClass)) {
+                    Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
+                    if (!Arrays.equals((Object[]) valueEntity, array)) ;
+                    return true;
+                }
+                if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
+                    boolean changedChild = isEntityModified(valueEntity, (Map<String, Object>) value);
+                    if (changedChild)
+                        return true;
+                }
+//                if (Collection.class.isAssignableFrom(valueEntityClass)){
+//                    Collection collectionValue = (Collection) value;
+//                    Collection collectionEntity = (Collection)valueEntity;
+//                    if (collectionValue.size()!= collectionEntity.size())
+//                        return false;
+//                    for (Object valueElement :  collectionValue){
+//                        Object foundvalue = collectionEntity.stream().filter(e -> e.equals(valueElement))
+//                                .findFirst().orElse(null);
+//
+//                    }
+//
+//                    ((Collection) valueEntity).stream().forEach(o -> {});
+//                }
+                if (!value.equals(valueEntity))
+                    return true;
+            }
+
+        }
+        return false;
     }
 
     /**
@@ -492,7 +575,6 @@ public abstract class RestControllerEngine {
         value = Enum.valueOf((Class) setMethod.getParameterTypes()[0], (String) value);
         setMethod.invoke(entity, value);
     }
-
 
 
     /**
@@ -750,7 +832,7 @@ public abstract class RestControllerEngine {
 
     /**
      * Clona un'entità usando jackson. Prima la trasforma in String e poi crea un oggetto a partire dalla quella.
-     *
+     * <p>
      * TODO considerare il fatto che potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} cercare altre soluzioni
      *
      * @param entity l'entità da clonare
@@ -893,6 +975,7 @@ public abstract class RestControllerEngine {
      * @return
      * @throws RestControllerEngineException
      */
+    @Transactional(readOnly = true)
     protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
         Class projectionClass;

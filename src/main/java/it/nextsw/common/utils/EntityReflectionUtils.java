@@ -46,7 +46,7 @@ public class EntityReflectionUtils {
 
     public static Method getPrimaryKeyGetMethod(Class entityClass) throws NoSuchMethodException {
         Field primaryKeyField = getPrimaryKeyField(entityClass);
-        return entityClass.getMethod("get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, primaryKeyField.getName()));
+        return getGetMethod(entityClass,primaryKeyField.getName());
     }
 
     public static Field getPrimaryKeyField(Class entityClass) {
