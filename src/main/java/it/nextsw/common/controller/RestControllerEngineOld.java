@@ -129,7 +129,7 @@ public abstract class RestControllerEngineOld {
             }
 
             Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
-            Class<?> pkType = entityReflectionUtils.getPrimaryKeyField(entityClass).getType();
+            Class<?> pkType = EntityReflectionUtils.getPrimaryKeyField(entityClass).getType();
 
             Optional<Object> entity = generalRepository.findById(objectMapper.convertValue(id, pkType));
             if (entity.isPresent()) {
@@ -180,7 +180,7 @@ public abstract class RestControllerEngineOld {
              * considerato se passato).
              */
             if (entityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
-                Method primaryKeySetMethod = entityReflectionUtils.getPrimaryKeySetMethod(entity);
+                Method primaryKeySetMethod = EntityReflectionUtils.getPrimaryKeySetMethod(entity);
                 // si ottiene il metodo set della primary key e lo si setta a null
                 primaryKeySetMethod.invoke(entity, (Object) null);
                 log.warn(String.format("sto invocando %s.%s(%s)", entity.getClass().getSimpleName(), primaryKeySetMethod.getName(), null));
@@ -191,7 +191,7 @@ public abstract class RestControllerEngineOld {
                  * JPA farà un update invece che un inserimento. Per cui mi
                  * comporto come un update facendo il merge dei campi.
                  */
-                Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(entity);
+                Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entity);
                 Object id = primaryKeyGetMethod.invoke(entity);
                 if (id != null) {
                     Object foundEntity = em.find(entityClass, id);
@@ -270,7 +270,7 @@ public abstract class RestControllerEngineOld {
                  * prefisso "fk_"
                  */
                 String fieldName = key.substring("fk_".length());
-                Field fkField = entityReflectionUtils.getEntityFromProxyObject(fieldValue).getDeclaredField(fieldName);
+                Field fkField = EntityReflectionUtils.getEntityFromProxyObject(fieldValue).getDeclaredField(fieldName);
 
                 /**
                  * il valore del campo è l'oggetto ForeignKey, del quale serve
@@ -302,7 +302,7 @@ public abstract class RestControllerEngineOld {
                  */
 
                 String fieldName = key;
-                Class entityClass = entityReflectionUtils.getEntityFromProxyObject(fieldValue);
+                Class entityClass = EntityReflectionUtils.getEntityFromProxyObject(fieldValue);
 
                 // campo interessato sull'entità
                 Field entityField = entityClass.getDeclaredField(fieldName);
@@ -320,13 +320,13 @@ public abstract class RestControllerEngineOld {
                 Object dataChildValue = childMapValue.get(key);
 
                 // caso un cui il campo interessato è un'entità
-                if (fieldChildValue != null && entityReflectionUtils.isEntityClassFromProxyObject(fieldChildValue.getClass())) {
+                if (fieldChildValue != null && EntityReflectionUtils.isEntityClassFromProxyObject(fieldChildValue.getClass())) {
 
                     // si richiama il metodo ricorsivamente per gestire l'entità
                     manageNestedEntity(fieldChildValue, dataChildValue, request, additionalDataMap);
 
                     boolean hasSerialPrimaryKey = entityReflectionUtils.hasSerialPrimaryKey(fieldChildValue.getClass());
-                    Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildValue.getClass());
+                    Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(fieldChildValue.getClass());
 
                     /**
                      * tiro fuori l'id dell'entità che si vuole
@@ -355,8 +355,8 @@ public abstract class RestControllerEngineOld {
                          * sull'entità padre tramite il metodo set.
                          */
                         if (!hasSerialPrimaryKey) {
-                            fieldChildValue = objectMapper.readValue(objectMapper.writeValueAsString(fieldChildValue), entityReflectionUtils.getEntityFromProxyObject(fieldChildValue));
-                            if (em.find(entityReflectionUtils.getEntityFromProxyObject(fieldChildValue), id) == null) {
+                            fieldChildValue = objectMapper.readValue(objectMapper.writeValueAsString(fieldChildValue), EntityReflectionUtils.getEntityFromProxyObject(fieldChildValue));
+                            if (em.find(EntityReflectionUtils.getEntityFromProxyObject(fieldChildValue), id) == null) {
                                 creatingNewEntity = true;
                             }
                             setMethod.invoke(fieldValue, fieldChildValue);
@@ -398,7 +398,7 @@ public abstract class RestControllerEngineOld {
                          * azienda diversa da quella di cui la lista è figlia
                          */
                         // filterFieldName mi da il nome del campo interessato (nell'esempio precedente "idAzienda")
-                        String filterFieldName = entityReflectionUtils.getFilterFieldName(entityField, entityClass);
+                        String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
                         // vado a rimuovere dal json passato i campi interessati
                         ((Map) ((Map) dataChildCollectionValue)).remove(filterFieldName);
                         ((Map) ((Map) dataChildCollectionValue)).remove("fk_" + filterFieldName);
@@ -412,15 +412,15 @@ public abstract class RestControllerEngineOld {
 
                         // come nel caso delle entità precedenti devo capire se l'entità sarà inserita o modificata per poter lanciare i giusti interceptor
                         boolean hasSerialPrimaryKey = entityReflectionUtils.hasSerialPrimaryKey(fieldChildCollectionValue.getClass());
-                        Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(fieldChildCollectionValue.getClass());
+                        Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(fieldChildCollectionValue.getClass());
                         Object id = ((Map<String, Object>) dataChildCollectionValue).get(primaryKeyField.getName());
                         if (id == null) {
                             fieldChildCollectionValue = restControllerInterceptor.executebeforeCreateInterceptor(fieldChildCollectionValue, request, additionalDataMap);
                         } else {
                             boolean creatingNewEntity = false;
                             if (!hasSerialPrimaryKey) {
-                                fieldChildCollectionValue = objectMapper.readValue(objectMapper.writeValueAsString(fieldChildCollectionValue), entityReflectionUtils.getEntityFromProxyObject(fieldChildCollectionValue));
-                                if (em.find(entityReflectionUtils.getEntityFromProxyObject(fieldChildCollectionValue), id) == null) {
+                                fieldChildCollectionValue = objectMapper.readValue(objectMapper.writeValueAsString(fieldChildCollectionValue), EntityReflectionUtils.getEntityFromProxyObject(fieldChildCollectionValue));
+                                if (em.find(EntityReflectionUtils.getEntityFromProxyObject(fieldChildCollectionValue), id) == null) {
                                     creatingNewEntity = true;
                                 }
                                 ////???
@@ -442,7 +442,7 @@ public abstract class RestControllerEngineOld {
                      * "deletedEntitiesMap". Se ce ne sono eseguo il
                      * beforeDeleteInterceptor.
                      */
-                    if (entityReflectionUtils.hasOrphanRemoval(entityField)) {
+                    if (EntityReflectionUtils.hasOrphanRemoval(entityField)) {
                         Collection deletedEntities = deletedEntitiesMap.get(getMethod.toGenericString());
                         if (deletedEntities != null && !deletedEntities.isEmpty()) {
                             for (Object deletedEntity : deletedEntities) {
@@ -639,7 +639,7 @@ public abstract class RestControllerEngineOld {
                         // ora rimuovo gli elementi aggiunti dalla collection "deletedEntities" salvata prima; con questo ottengo gli elementi che saranno eliminati
                         deletedEntities.removeAll(elementsCollection);
                     } else {
-                        Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
+                        Class trueEntityClass = EntityReflectionUtils.getEntityFromProxyObject(entity);
                         Field field = trueEntityClass.getDeclaredField(key);
                         if (EntityReflectionUtils.isForeignKeyField(field)) {
                             /**
@@ -695,7 +695,7 @@ public abstract class RestControllerEngineOld {
         Class res;
         if (projection == null) {
             try {
-                res = entityReflectionUtils.getDefaultProjection(getGeneralRepository(request));
+                res = EntityReflectionUtils.getDefaultProjection(getGeneralRepository(request));
             } catch (EntityReflectionException ex) {
                 throw new RestControllerEngineException(ex);
             }
@@ -777,7 +777,7 @@ public abstract class RestControllerEngineOld {
              */
             BooleanExpression findByIdExpression = new PathBuilder(
                     BooleanExpression.class, path.getRoot().toString()).
-                    get(entityReflectionUtils.getPrimaryKeyField((Class) path.getAnnotatedElement()).getName()).eq(id).
+                    get(EntityReflectionUtils.getPrimaryKeyField((Class) path.getAnnotatedElement()).getName()).eq(id).
                     and(predicate);
 //            Object entity = ((JpaRepository) generalRepository).findById(id).get();
 //            new PathBuilder(predicate.getType()-, BASE_URL)
