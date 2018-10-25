@@ -473,11 +473,11 @@ public abstract class RestControllerEngine {
         for (String key : values.keySet()) {
             Object value = values.get(key);
             Object valueEntity = EntityReflectionUtils.getGetMethod(entity.getClass(), key).invoke(entity);
-            // gestiamo casi tipi primitivi e null
-            //if (value != valueEntity || ((value == null && valueEntity != null) || (value != null && valueEntity == null)))
-            if (value != valueEntity)
-                return true;
-            else {
+            
+            if (value != valueEntity) {
+                // gestiamo casi tipi primitivi e null
+                if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
+                    return true;
                 Class valueEntityClass = EntityReflectionUtils.getDeclaredField(entity.getClass(), key).getType();
                 if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
                     return true;
