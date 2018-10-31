@@ -354,35 +354,45 @@ public abstract class RestControllerEngine {
              * se sono nel caso di update l'entità in input di questa funzione lo ha già settato e se lo cambiassi avrei un errore
              */
             if (!hasSerialPrimaryKey || !entityPkFieldName.equals(key)) {
-                Method setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
-                Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
-                if (value != null) {
-                    if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
-                        manageDateMerge(entity, value, setMethod);
-                    } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
-                        manageArrayMerge(entity, value, setMethod);
-                    } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
-                        manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod);
+                Method setMethod = null;
+                Method getMethod = null;
+                Field field = null;
+                try {          
+                    field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+                    setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
+                    getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+                }
+                catch (Exception ex) {
+                }
+                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
+                    if (value != null) {
+                        if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
+                            manageDateMerge(entity, value, setMethod);
+                        } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                            manageArrayMerge(entity, value, setMethod);
+                        } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                            manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod);
 
-                    } else if (EntityReflectionUtils.isForeignKeyField(EntityReflectionUtils.getDeclaredField(entityClass, key))) {
-                        /*
-                         * caso in cui l'elemento è un'entità singola,
-                         * richiamo ricorsivamente il merge sull'oggetto.
-                        */
-                        manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
-                    } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
-                        manageEnumMerge(entity, value, setMethod);
+                        } else if (EntityReflectionUtils.isForeignKeyField(field)) {
+                            /*
+                             * caso in cui l'elemento è un'entità singola,
+                             * richiamo ricorsivamente il merge sull'oggetto.
+                            */
+                            manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
+                        } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                            manageEnumMerge(entity, value, setMethod);
+                        } else {
+                            /*
+                             * tutti gli altri casi, cioè l'elemento è un tipo
+                             * base (String o Integer, o forse qualche altro
+                             * caso che ora non mi viene in mente)
+                             */
+                            manageOtherCasesMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
+                        }
                     } else {
-                        /*
-                         * tutti gli altri casi, cioè l'elemento è un tipo
-                         * base (String o Integer, o forse qualche altro
-                         * caso che ora non mi viene in mente)
-                         */
-                        manageOtherCasesMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
+                        // in questo caso ho passato il valore null per settare il campo a null
+                        manageNullValueMerge(entity, entityClass, key, request, additionalDataMap, setMethod, getMethod);
                     }
-                } else {
-                    // in questo caso ho passato il valore null per settare il campo a null
-                    manageNullValueMerge(entity, entityClass, key, request, additionalDataMap, setMethod, getMethod);
                 }
             }
         }
@@ -477,93 +487,101 @@ public abstract class RestControllerEngine {
      * @return
      * @throws Exception 
      */
+    
     protected boolean willBeEntityModified(Object entity, Map<String, Object> values) throws Exception {
         for (String key : values.keySet()) {
             Object value = values.get(key);
-            Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
-            Object valueEntity = getMethod.invoke(entity);
-            if (value != valueEntity) {
-                // gestiamo casi null
-                if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
-                    return true;
+            Method getMethod = null;
+            Field field = null;
+            try {
+                field = EntityReflectionUtils.getDeclaredField(entity.getClass(), key);
+                getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+            }
+            catch (Exception ex) {
+            }
+            if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
+                Object valueEntity = getMethod.invoke(entity);
+                if (value != valueEntity) {
+                    // gestiamo casi null
+                    if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
+                        return true;
 
-                Field field = EntityReflectionUtils.getDeclaredField(entity.getClass(), key);
-                Class valueEntityClass = field.getType();
-                if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
-                    return true;
-                else if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
-                    LocalDateTime dateTime;
-                    try {
-                        // giorno e ora
-                        dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                    } catch (Exception ex) {
-                        // solo giorno
-                        //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-                        dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
-                    }
-                    if (!dateTime.equals(valueEntity))
+                    Class valueEntityClass = field.getType();
+                    if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
                         return true;
-                }
-                else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
-                    Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
-                    if (!Arrays.equals((Object[]) valueEntity, array))
-                        return true;
-                }
-                else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
-                    boolean changedChild = willBeEntityModified(valueEntity, (Map<String, Object>) value);
-                    if (changedChild)
-                        return true;
-                }
-                else if (Collection.class.isAssignableFrom(valueEntityClass)){
-                    Collection collectionValue = (Collection) value;
-                    Collection collectionEntity = (Collection)valueEntity;
-//                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
-                    if (collectionValue.size()!= collectionEntity.size())
-                        return true;
-                    // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
-                    Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
-                    Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
-                    Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
-                    Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
-                    String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
-                    for (Object valueElement :  collectionValue){
-                        Object valueElementPk = ((Map<String, Object>) valueElement).get(childValuePrimaryKeyFieldName);
-                        Object childEntityElement = collectionEntity.stream().filter(
-                                e -> {
-                                    Object childEntityPk;
-                                    try {
-                                        childEntityPk = childEntityPrimaryKeyGetMethod.invoke(e);
-                                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
-                                        return false;
-                                    }
-                                    if (childEntityPk == null)
-                                        return false;
-                                    else
-                                        return childEntityPk.equals(valueElementPk);
-                                }
-                        ).findFirst().orElse(null);
-                        if (childEntityElement == null)
+                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                        LocalDateTime dateTime;
+                        try {
+                            // giorno e ora
+                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                        } catch (Exception ex) {
+                            // solo giorno
+                            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
+                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                        }
+                        if (!dateTime.equals(valueEntity))
                             return true;
-                        else {
-                            boolean changedChild = willBeEntityModified(childEntityElement, (Map<String, Object>) valueElement);
-                            if (changedChild)
+                    }
+                    else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
+                        Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
+                        if (!Arrays.equals((Object[]) valueEntity, array))
+                            return true;
+                    }
+                    else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
+                        boolean changedChild = willBeEntityModified(valueEntity, (Map<String, Object>) value);
+                        if (changedChild)
+                            return true;
+                    }
+                    else if (Collection.class.isAssignableFrom(valueEntityClass)){
+                        Collection collectionValue = (Collection) value;
+                        Collection collectionEntity = (Collection)valueEntity;
+    //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
+                        if (collectionValue.size()!= collectionEntity.size())
+                            return true;
+                        // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
+                        Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
+                        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                        Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
+                        Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
+                        String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
+                        for (Object valueElement :  collectionValue){
+                            Object valueElementPk = ((Map<String, Object>) valueElement).get(childValuePrimaryKeyFieldName);
+                            Object childEntityElement = collectionEntity.stream().filter(
+                                    e -> {
+                                        Object childEntityPk;
+                                        try {
+                                            childEntityPk = childEntityPrimaryKeyGetMethod.invoke(e);
+                                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                                            return false;
+                                        }
+                                        if (childEntityPk == null)
+                                            return false;
+                                        else
+                                            return childEntityPk.equals(valueElementPk);
+                                    }
+                            ).findFirst().orElse(null);
+                            if (childEntityElement == null)
                                 return true;
+                            else {
+                                boolean changedChild = willBeEntityModified(childEntityElement, (Map<String, Object>) valueElement);
+                                if (changedChild)
+                                    return true;
+                            }
                         }
                     }
-                }
-                // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
-                else if(String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
-                    if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
-                        return true;
+                    // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
+                    else if(String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
+                        if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
+                            return true;
+                        }
+                    }
+                    // questo if gestisce tutti gli altri casi che verosimilmente saranno i tipi base e i tipi primitivi
+                    // NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+                    else if (!value.equals(valueEntity)) {
+                         return true;
                     }
                 }
-                // questo if gestisce tutti gli altri casi che verosimilmente saranno i tipi base e i tipi primitivi
-                // NB: nel caso di classi custom è necessario l'implementazione del metodo equals
-                else if (!value.equals(valueEntity)) {
-                     return true;
-                }
             }
-
         }
         return false;
     }
@@ -927,7 +945,9 @@ public abstract class RestControllerEngine {
         Field[] fields = entity.getClass().getDeclaredFields();
         if (fields != null && fields.length > 0) {
             for (Field field : fields) {
-                if (Collection.class.isAssignableFrom(field.getType())) {
+//                Type actualTypeArgument = ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+//                Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                if (EntityReflectionUtils.isForeignKeyField(field) && Collection.class.isAssignableFrom(field.getType())) {
                     Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), field.getName());
                     Collection childEntityCollection = (Collection) getMethod.invoke(entity);
                     for (Object childEntity : childEntityCollection) {
