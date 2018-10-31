@@ -97,10 +97,11 @@ public class ProjectionsInterceptorLauncher {
      * @throws ClassNotFoundException
      * @throws InterceptorException
      */
-    public Object lanciaInterceptor(Object target, String methodName, Class returnType) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException {
-        Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(returnType); // Recupero la classe che sto espandendo dalla sua ProxyClass
+    public Object lanciaInterceptor(Object target, String methodName) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException {
+//        Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(returnType); // Recupero la classe che sto espandendo dalla sua ProxyClass
 
         Method method = target.getClass().getMethod(methodName);    // Recupero il metodo che sto gestendo (quello su cui c'è l'annotazione)
+        Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(method.getReturnType()); // Recupero la classe che sto espandendo dalla sua ProxyClass
         Object invoke = method.invoke(target);                      // Eseguo il metodo sull'istanza dell'entità di partenza in modo da recuperare l'entità da espandere (In realtà l'esecuzione del metodo non esegue la query ma torna l'istanza dell'entità con popolato solo l'id)
         Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(invoke); // Dall'oggetto precedente prendo il metodo per recuperare la primaryKey dell'entity che sto espandendo
         Object id = primaryKeyGetMethod.invoke(invoke);             // Prendo il valore della primaryKey dell'entità che sto espandendo
@@ -142,7 +143,7 @@ public class ProjectionsInterceptorLauncher {
                 invoke.getClass().getMethod("getDescrizione").invoke(invoke);
                 System.out.println("aaaaa");
             }
-            entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
+            entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
             if (entity != null) {
                 Class<?> projectionClass = projectionsMap.get(entityFromProxyClass.getSimpleName() + "WithPlainFields");  // Recupero la classe della projection con i campi base dell'entità interessata
                 entity = factory.createProjection(projectionClass, entity); // Applico la projection con i campi base al risultato
