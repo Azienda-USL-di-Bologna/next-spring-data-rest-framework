@@ -1,2 +1,5 @@
 syntax: glob
 target
+.idea/.name
+.idea
+next-spring-data-rest-framework.iml
