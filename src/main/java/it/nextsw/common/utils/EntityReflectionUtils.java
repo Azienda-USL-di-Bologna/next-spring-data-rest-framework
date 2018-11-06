@@ -93,6 +93,11 @@ public class EntityReflectionUtils {
         java.lang.annotation.Annotation annotation = classz.getAnnotation(javax.persistence.Entity.class);
         return annotation != null;
     }
+    
+    public static boolean isColumnOrFkField(Field field) {
+        java.lang.annotation.Annotation columnAnnotation = field.getAnnotation(Column.class);
+        return columnAnnotation != null || EntityReflectionUtils.isForeignKeyField(field);
+    }
 
     /**
      * Torna la classe Entity vera e propria a partire degli oggetti proxy
