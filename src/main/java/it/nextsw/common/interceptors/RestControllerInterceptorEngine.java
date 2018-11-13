@@ -69,13 +69,13 @@ public class RestControllerInterceptorEngine {
                 if (entity != null) {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
-                    em.detach(entity);
+//                    em.detach(entity);
                 } else {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entities.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);
                     if (entities != null) {
                         for (Object e : entities) {
-                            em.detach(e);
+//                            em.detach(e);
                         }
                     }
                 }

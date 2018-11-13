@@ -1,6 +1,7 @@
 package it.nextsw.common.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
@@ -33,6 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.logging.Level;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -49,7 +51,6 @@ import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.ResourceAssembler;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -283,12 +284,6 @@ public abstract class RestControllerEngine {
                 throw new NotFoundResourceException(String.format("la risorsa con id %s non è stata trovata", id.toString()));
             }
 
-//            Object beforeUpdateEntity = objectMapper.convertValue(entity, entityReflectionUtils.getEntityFromProxyObject(entity));
-            Object beforeUpdateEntity = cloneEntity(entity);
-
-            // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
-            Object res = merge(data, entity, request, additionalData);
-
             JpaRepository generalRepository;
             if (StringUtils.hasText(entityPath)) {
                 generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
@@ -296,9 +291,19 @@ public abstract class RestControllerEngine {
                 generalRepository = (JpaRepository) getGeneralRepository(request, true);
             }
 
-            restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
+            boolean willBeEntityModified = willBeEntityModified(entity, data);
 
-            generalRepository.save(res);
+            Object res = entity;
+            if (willBeEntityModified) {
+                Object beforeUpdateEntity = cloneEntity(entity);
+
+                // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
+                res = merge(data, entity, request, additionalData);
+
+                restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
+
+                generalRepository.save(res);
+            }
             /*
              * viene ritornata l'entità inserita con tutti i campi, compreso l'id generato, con la projection base applicata,
              * ma nel caso di batch non applico la projection
@@ -344,21 +349,22 @@ public abstract class RestControllerEngine {
 
             Object value = data.get(key);
             /*
-             * se sono stati passati dei campi ForeignKey (cioè che iniziano con
-             * la stringa "fk_") vuol dire che non si deve inserire l'entità di
-             * foreign key, ma usarne una già esistente
+             * se l'entità ha una pk seriale, devo saltare il settaggio dell'id perché:
+             * se sono nel caso di insert deve rimanere null per cui se l'ho passato non lo devo settare altrimenti avrei un errore
+             * se sono nel caso di update l'entità in input di questa funzione lo ha già settato e se lo cambiassi avrei un errore
              */
-            if (key.startsWith("fk_")) {
-                // manageFkMerge(entity, entityClass, key, value);
-            } else {
-                /*
-                 * se 'entità ha una pk seriale, devo saltare il settaggio dell'id perché:
-                 * se sono nel caso di insert deve rimanere null per cui se l'ho passato non lo devo settare altrimenti avrei un errore
-                 * se sono nel caso di update l'entità in input di questa funzione lo ha già settato e se lo cambiassi avrei un errore
-                 */
-                if (!hasSerialPrimaryKey || !entityPkFieldName.equals(key)) {
-                    Method setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
-                    Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+            if (!hasSerialPrimaryKey || !entityPkFieldName.equals(key)) {
+                Method setMethod = null;
+                Method getMethod = null;
+                Field field = null;
+                try {          
+                    field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+                    setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
+                    getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+                }
+                catch (Exception ex) {
+                }
+                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
                     if (value != null) {
                         if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
                             manageDateMerge(entity, value, setMethod);
@@ -367,7 +373,11 @@ public abstract class RestControllerEngine {
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod);
 
-                        } else if (EntityReflectionUtils.isForeignKeyField(EntityReflectionUtils.getDeclaredField(entityClass, key))) {
+                        } else if (EntityReflectionUtils.isForeignKeyField(field)) {
+                            /*
+                             * caso in cui l'elemento è un'entità singola,
+                             * richiamo ricorsivamente il merge sull'oggetto.
+                            */
                             manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageEnumMerge(entity, value, setMethod);
@@ -414,115 +424,175 @@ public abstract class RestControllerEngine {
      */
     protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
         Field field = EntityReflectionUtils.getDeclaredField(entityClass, key);
-        /*
-         * caso in cui l'elemento è un entità singola,
-         * richiamo ricorsivamente il merge sull'oggetto.
-         */
+        Class childEntityClass = field.getType();
         boolean inserting = false;
-        boolean isModified = false;
         Object childEntity = getMethod.invoke(entity);
         Object beforeUpdateEntity = null;
+        childEntity = extractCorrectChildEntity(value, childEntity, childEntityClass);
         if (childEntity == null) {
             inserting = true;
             childEntity = field.getType().newInstance();
-        } else {
-            beforeUpdateEntity = cloneEntity(childEntity);
-            childEntity = extractCorrectChildEntity(value, childEntity);
         }
 
-        isModified = isEntityModified(entity, value);
+        boolean willBeEntityModified = willBeEntityModified(childEntity, value);
+        if (willBeEntityModified)
+            beforeUpdateEntity = cloneEntity(childEntity);
         childEntity = merge(value, childEntity, request, additionalDataMap);
         if (inserting) {
             childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
-            if (isModified)
-                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
-        }
+        } else if (willBeEntityModified)
+            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
         setMethod.invoke(entity, childEntity);
     }
 
     /**
      * Il metodo si occupa di ritornare l'esatta childEntity confrontando la childEntity settata sull'entità e
-     * quella proveniente dal JSON. Per esatta si intende la childEntity con l'id presente nel JSON.
+     * quella proveniente dal JSON.Per esatta si intende la childEntity con l'id presente nel JSON.
      *
      * @param value
      * @param childEntity
+     * @param childEntityClass
      * @return
      * @throws IllegalAccessException
      * @throws InvocationTargetException
      * @throws NoSuchMethodException
      */
-    protected Object extractCorrectChildEntity(Map<String, Object> value, Object childEntity) throws Exception {
-        Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntity.getClass()).invoke(childEntity);
-        Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntity.getClass()).getName());
-        // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
-        if (!childEntityPKey.getClass().equals(valuePKey.getClass())) {
-            if (Number.class.isAssignableFrom(childEntityPKey.getClass())) {
-                if (childEntityPKey.getClass().equals(Long.class))
-                    valuePKey = ((Number) valuePKey).longValue();
+    protected Object extractCorrectChildEntity(Map<String, Object> value, Object childEntity, Class childEntityClass) throws Exception {
+        Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntityClass).getName());
+        if (childEntity != null) {
+            Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass).invoke(childEntity);
+            // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
+            if (!childEntityPKey.getClass().equals(valuePKey.getClass())) {
+                if (Number.class.isAssignableFrom(childEntityPKey.getClass())) {
+                    if (childEntityPKey.getClass().equals(Long.class))
+                        valuePKey = ((Number) valuePKey).longValue();
+                }
             }
+            // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
+            if (!childEntityPKey.equals(valuePKey)) {
+                childEntity = em.find(childEntityClass, valuePKey);
+            }
+        } else {
+            childEntity = em.find(childEntityClass, valuePKey);
         }
-        // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
-        if (!childEntityPKey.equals(valuePKey)) {
-            childEntity = em.find(childEntity.getClass(), valuePKey);
-        }
+
         return childEntity;
     }
 
-    protected boolean isEntityModified(Object entity, Map<String, Object> values) throws Exception {
-        boolean result = false;
+    /**
+     * Controlla se l'entità sarà modificata
+     * NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+     * @param entity
+     * @param values
+     * @return
+     * @throws Exception 
+     */
+    
+    protected boolean willBeEntityModified(Object entity, Map<String, Object> values) throws Exception {
         for (String key : values.keySet()) {
             Object value = values.get(key);
-            Object valueEntity = EntityReflectionUtils.getGetMethod(entity.getClass(), key).invoke(entity);
-            // gestiamo casi tipi primitivi e null
-            //if (value != valueEntity || ((value == null && valueEntity != null) || (value != null && valueEntity == null)))
-            if (value != valueEntity)
-                return true;
-            else {
-                Class valueEntityClass = EntityReflectionUtils.getDeclaredField(entity.getClass(), key).getType();
-                if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
-                    return true;
-                if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
-                    LocalDateTime dateTime;
-                    try {
-                        // giorno e ora
-                        dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                    } catch (Exception ex) {
-                        // solo giorno
-                        //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-                        dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
-                    }
-                    if (!dateTime.equals(valueEntity))
-                        return true;
-                }
-                if ((Object[].class).isAssignableFrom(valueEntityClass)) {
-                    Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
-                    if (!Arrays.equals((Object[]) valueEntity, array)) ;
-                    return true;
-                }
-                if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
-                    boolean changedChild = isEntityModified(valueEntity, (Map<String, Object>) value);
-                    if (changedChild)
-                        return true;
-                }
-//                if (Collection.class.isAssignableFrom(valueEntityClass)){
-//                    Collection collectionValue = (Collection) value;
-//                    Collection collectionEntity = (Collection)valueEntity;
-//                    if (collectionValue.size()!= collectionEntity.size())
-//                        return false;
-//                    for (Object valueElement :  collectionValue){
-//                        Object foundvalue = collectionEntity.stream().filter(e -> e.equals(valueElement))
-//                                .findFirst().orElse(null);
-//
-//                    }
-//
-//                    ((Collection) valueEntity).stream().forEach(o -> {});
-//                }
-                if (!value.equals(valueEntity))
-                    return true;
+            Method getMethod = null;
+            Field field = null;
+            try {
+                field = EntityReflectionUtils.getDeclaredField(entity.getClass(), key);
+                getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
             }
+            catch (Exception ex) {
+            }
+            if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
+                Object valueEntity = getMethod.invoke(entity);
+                if (value != valueEntity) {
+                    // gestiamo casi null
+                    if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
+                        return true;
 
+                    Class valueEntityClass = field.getType();
+                    if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
+                        return true;
+                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                        LocalDateTime dateTime;
+                        try {
+                            // giorno e ora
+                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                        } catch (Exception ex) {
+                            // solo giorno
+                            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
+                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                        }
+                        if (!dateTime.equals(valueEntity))
+                            return true;
+                    }
+                    else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
+                        Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
+                        if (!Arrays.equals((Object[]) valueEntity, array))
+                            return true;
+                    }
+                    else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
+                        boolean changedChild = willBeEntityModified(valueEntity, (Map<String, Object>) value);
+                        if (changedChild)
+                            return true;
+                    }
+                    else if (Collection.class.isAssignableFrom(valueEntityClass)){
+                        Collection collectionValue = (Collection) value;
+                        Collection collectionEntity = (Collection)valueEntity;
+    //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
+                        if (collectionValue.size()!= collectionEntity.size())
+                            return true;
+                        // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
+                        Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
+                        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                        Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
+                        Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
+                        String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
+                        for (Object valueElement :  collectionValue){
+                            Object valueElementPk = ((Map<String, Object>) valueElement).get(childValuePrimaryKeyFieldName);
+                            Object childEntityElement = collectionEntity.stream().filter(
+                                    e -> {
+                                        Object childEntityPk;
+                                        try {
+                                            childEntityPk = childEntityPrimaryKeyGetMethod.invoke(e);
+                                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                                            return false;
+                                        }
+                                        if (childEntityPk == null)
+                                            return false;
+                                        else
+                                            return childEntityPk.equals(valueElementPk);
+                                    }
+                            ).findFirst().orElse(null);
+                            if (childEntityElement == null)
+                                return true;
+                            else {
+                                boolean changedChild = willBeEntityModified(childEntityElement, (Map<String, Object>) valueElement);
+                                if (changedChild)
+                                    return true;
+                            }
+                        }
+                    }
+                    // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
+                    else if(String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
+                        if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
+                            return true;
+                        }
+                    }
+                    // questo if gestisce tutti gli altri casi che verosimilmente saranno i tipi base e i tipi primitivi
+                    // NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+                    else if (!value.equals(valueEntity)) {
+                         return true;
+                    }
+                }
+            }
         }
         return false;
+    }
+    
+    protected boolean isJsonParsable(String value) {
+        try {
+            JsonNode valueJsonNode = objectMapper.readTree((String) value);
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
     }
 
     /**
@@ -672,11 +742,11 @@ public abstract class RestControllerEngine {
         Method childPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
         for (Map<String, Object> childValue : childValues) {
             Object childEntity;
-            boolean inserting = true;
+            boolean inserting = false;
             /* controllo se nell'entità passata è presente l'id (la primary key in generale)
              * se c'è cerco l'oggetto nella lista degli elementi presenti nell'entità:
              * - se lo trovo allora vorrà dire che farò un update
-             * - se non lo trovo allora vorrà dire che farò un insert
+             * - se non lo trovo allora provo a caricarla dal DB, se c'è allora vuol dire che la voglio associare all'entità, altrimenti vorrà dire che farò un insert
              */
             Object childValuePk = childValue.get(childPrimaryKeyField.getName());
 
@@ -685,7 +755,7 @@ public abstract class RestControllerEngine {
                     Object pk;
                     try {
                         pk = childPrimaryKeyGetMethod.invoke(e);
-                    } catch (Exception ex) {
+                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                         return false;
                     }
                     return pk.equals(childValuePk);
@@ -694,35 +764,43 @@ public abstract class RestControllerEngine {
                     inserting = false;
                     childEntity = childEntityOp.get();
                 } else {
-                    childEntity = childEntityClass.getConstructor().newInstance();
-                    //                                    childEntity = objectMapper.convertValue(childValue, childEntityClass);
+                    // se la trovo sul DB allora la associo all'entità
+                    childEntity = em.find(childEntityClass, childValuePk);
+                    if (childEntity == null) { // se non c'è sul DB allora ne creerò una nuova
+                        inserting = true;
+                        childEntity = childEntityClass.getConstructor().newInstance();
+                    }
                 }
             } else {
+                inserting = true;
                 childEntity = childEntityClass.getConstructor().newInstance();
             }
-
+            
             /*
              * Siccome gli oggetti della lista sono per forza figli dell'entità padre, togliamo gli eventuali riferimenti
              * all'entità padre e settiamo forzatamente quello giusto.
              * Es. se stiamo agendo sull'entità Azienda con id = 1 e nella lista troviamo:
-             * [ {
-             * "nome": "gdm",
-             * "cognome": dmg,
-             * "fk_idAzienda": {
-             * "id": 3
-             * }
-             * },
-             * {
-             * "nome": "gdm",g
-             * "cognome": dmg,
-             * "idAzienda": {
-             * "id": 3,
-             * "nome": "Ausl Parma"
-             * }
-             * } ]
+             * [ 
+             *  {
+             *      "nome": "gdm",
+             *      "cognome": dmg,
+             *      "fk_idAzienda": {
+             *          "id": 3
+             *      }
+             *  },
+             *  {
+             *      "nome": "gdm",g
+             *      "cognome": dmg,
+             *      "idAzienda": {
+             *          "id": 3,
+             *      "nome": "Ausl Parma"
+             *      }
+             *  } 
+             * ]
              * devo rimuovere dalla prima entità l'oggetto "fk_idAzienda" e dalla seconda l'oggetto "idAzienda",
              * perché si riferiscono a un'azienda diversa da quella di cui la lista è figlia
              */
+
             // filterFieldName mi da il nome del campo interessato (nell'esempio precedente "idAzienda")
             String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
             // vado a rimuovere dal json passato i campi interessati
@@ -734,16 +812,18 @@ public abstract class RestControllerEngine {
             setParentFkMethod.invoke(childEntity, entity);
 
             Object beforeUpdateEntity = null;
+            boolean willBeEntityModified = false;
             if (!inserting) {
-                //                                beforeUpdateEntity = objectMapper.convertValue(childEntity, childEntityClass);
-                beforeUpdateEntity = cloneEntity(childEntity);
+                willBeEntityModified = willBeEntityModified(childEntity, childValue);
+                if (willBeEntityModified)
+                    beforeUpdateEntity = cloneEntity(childEntity);
             }
             // per ognuno chiamo ricorsivamente il merge in modo da gestire gli eventuali figli
             childEntity = merge(childValue, childEntity, request, additionalDataMap);
 
             if (inserting) {
                 childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
-            } else {
+            } else if (willBeEntityModified) {
                 childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
             }
 
@@ -763,7 +843,7 @@ public abstract class RestControllerEngine {
             deletedEntities.addAll(entityElementsCollection);
             // ora rimuovo gli elementi che sto inserendo/modificando; con questo ottengo gli elementi che saranno eliminati
             deletedEntities.removeAll(newElementCollection);
-            //                        deletedEntitiesMap.put(getMethod.toGenericString(), deletedEntities);
+            // deletedEntitiesMap.put(getMethod.toGenericString(), deletedEntities);
 
             if (!deletedEntities.isEmpty()) {
                 for (Object deletedEntity : deletedEntities) {
@@ -782,7 +862,8 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Il metodo serve per gestire le fk durante la merge dell'oggetto
+     * Il metodo serve per gestire le fk durante la merge dell'oggetto.
+     * Non più usato
      *
      * @param entity
      * @param entityClass
@@ -794,6 +875,7 @@ public abstract class RestControllerEngine {
      * @throws IllegalAccessException
      * @throws InvocationTargetException
      */
+    @Deprecated
     protected void manageFkMerge(Object entity, Class entityClass, String key, Object value) throws NoSuchFieldException, EntityReflectionException, RestControllerEngineException, IllegalAccessException, InvocationTargetException {
         /*
          * si cerca il campo sulla classe dell'entità corrispondente
@@ -863,7 +945,9 @@ public abstract class RestControllerEngine {
         Field[] fields = entity.getClass().getDeclaredFields();
         if (fields != null && fields.length > 0) {
             for (Field field : fields) {
-                if (Collection.class.isAssignableFrom(field.getType())) {
+//                Type actualTypeArgument = ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+//                Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                if (EntityReflectionUtils.isForeignKeyField(field) && Collection.class.isAssignableFrom(field.getType())) {
                     Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), field.getName());
                     Collection childEntityCollection = (Collection) getMethod.invoke(entity);
                     for (Object childEntity : childEntityCollection) {
