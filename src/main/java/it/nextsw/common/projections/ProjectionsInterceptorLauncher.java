@@ -86,7 +86,6 @@ public class ProjectionsInterceptorLauncher {
      *
      * @param target: è l'istanza dell'entità su cui sto facendo l'expand
      * @param methodName: è il nome del getter in uso per fare l'expand
-     * @param returnType: è la classe dell'entità che sto espandendo (in realtà
      * la classe è una ProxyClass)
      * @return l'oggetto espanso (se non è bloccato dall'interceptor)
      * @throws EntityReflectionException
@@ -103,6 +102,8 @@ public class ProjectionsInterceptorLauncher {
         Method method = target.getClass().getMethod(methodName);    // Recupero il metodo che sto gestendo (quello su cui c'è l'annotazione)
         Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(method.getReturnType()); // Recupero la classe che sto espandendo dalla sua ProxyClass
         Object invoke = method.invoke(target);                      // Eseguo il metodo sull'istanza dell'entità di partenza in modo da recuperare l'entità da espandere (In realtà l'esecuzione del metodo non esegue la query ma torna l'istanza dell'entità con popolato solo l'id)
+        if (invoke == null)
+            return target;
         Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(invoke); // Dall'oggetto precedente prendo il metodo per recuperare la primaryKey dell'entity che sto espandendo
         Object id = primaryKeyGetMethod.invoke(invoke);             // Prendo il valore della primaryKey dell'entità che sto espandendo
 
