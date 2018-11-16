@@ -58,7 +58,7 @@ public class RestControllerInterceptorEngine {
         } else if (entities != null) {
             res = entities;
         } else {
-            throw new InterceptorException("errore, sia entity che entities sono nulli, passane almeno uno");
+            throw new InterceptorException("errore, sia entities che entities sono nulli, passane almeno uno");
         }
 
 //        fillInterceptorsCache();
@@ -69,7 +69,7 @@ public class RestControllerInterceptorEngine {
                 if (entity != null) {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entity.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entity, additionalData, request);
-//                    em.detach(entity);
+//                    em.detach(entities);
                 } else {
                     log.info(String.format("execute %s on %s", "afterSelectQueryInterceptor", entities.toString()));
                     res = interceptor.afterSelectQueryInterceptor(entities, additionalData, request);

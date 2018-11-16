@@ -100,7 +100,7 @@ public abstract class RestControllerEngine {
     protected Map<String, Class> projectionsMap;
 
     /**
-     * metodo che restituisce, se esiste, l'entity richiesta prendendola dal
+     * metodo che restituisce, se esiste, l'entities richiesta prendendola dal
      * repository
      *
      * @param id
@@ -133,7 +133,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Inserimento di una nuova entity
+     * Inserimento di una nuova entities
      *
      * @param data           - dati grezzi passati nella richiesta
      * @param request
@@ -186,7 +186,7 @@ public abstract class RestControllerEngine {
                     if (foundEntity != null) {
                         inserting = false;
                         entity = foundEntity;
-//                        beforeUpdateEntity = objectMapper.convertValue(entity, entityClass);
+//                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
                         beforeUpdateEntity = cloneEntity(entity);
                     }
                 }
@@ -227,7 +227,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Cancellazione di un'entity
+     * Cancellazione di un'entities
      *
      * @param id             - id dell'entità da eliminare
      * @param request
@@ -263,7 +263,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Aggiornamento di un'entity esistente
+     * Aggiornamento di un'entities esistente
      *
      * @param id
      * @param data
@@ -661,7 +661,7 @@ public abstract class RestControllerEngine {
     protected void manageArrayMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
         /*
          * Viene creato un array che contiere oggetti del tipo
-         * identificato dal campo nell'entity; una volta creato
+         * identificato dal campo nell'entities; una volta creato
          * l'array viene popolato con i valori passati nella
          * richiesta.
          */
@@ -898,7 +898,7 @@ public abstract class RestControllerEngine {
             // se si passa "fk_" con id null, vuol dire che voglio settare a null la fk per cui lascio l'oggetto fkReference a null
             if (fk.getId() != null) {
                 /*
-                 * viene creata l'entità tramite entity manager in modo che
+                 * viene creata l'entità tramite entities manager in modo che
                  * hibernate capisca che non la deve inserire
                  */
                 fkReference = em.getReference(fkField.getType(), fk.getId());
@@ -998,14 +998,20 @@ public abstract class RestControllerEngine {
     protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
 
-        if (withId) {
-            int slashPos = repositoryKey.lastIndexOf("/");
-            if (slashPos != -1) {
-                repositoryKey = repositoryKey.substring(0, slashPos);
-            }
+//        if (withId) {
+//            int slashPos = repositoryKey.lastIndexOf("/");
+//            if (slashPos != -1) {
+//                repositoryKey = repositoryKey.substring(0, slashPos);
+//            }
+//        }
+//        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
+        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
+            return request.getServletPath().toLowerCase().contains(s);
+        }).findFirst().orElse(null);
+        if (repoKey == null) {
+            new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
         }
-        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
-        return generalRepository;
+        return customRepositoryPathMap.get(repoKey);
     }
 
     /**
@@ -1069,7 +1075,7 @@ public abstract class RestControllerEngine {
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
-        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entity sulle projections
+        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entities sulle projections
         projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
 
         /*
@@ -1109,7 +1115,7 @@ public abstract class RestControllerEngine {
             Optional<Object> entityOptional = generalRepository.findOne(findByIdExpression);
             // controllo della presenza del risultato
             if (entityOptional.isPresent()) {
-                // si ottiene la entity
+                // si ottiene la entities
                 Object entity = entityOptional.get();
                 try {
                     // applicazione di afterSelectQueryInterceptor
@@ -1132,7 +1138,7 @@ public abstract class RestControllerEngine {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
                 /*
-                 * si spacchetta la Page che contiene le entity e si passa il
+                 * si spacchetta la Page che contiene le entities e si passa il
                  * tutto all'interceptor; una volta applicato l'interceptor
                  * viene ricreata la Page
                  */

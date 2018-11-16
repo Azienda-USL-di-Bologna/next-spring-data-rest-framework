@@ -15,7 +15,7 @@ package it.nextsw.common.interceptors;
 //    private int loads;
 //
 //    @Override
-//    public void onDelete(Object entity,
+//    public void onDelete(Object entities,
 //            Serializable id,
 //            Object[] state,
 //            String[] propertyNames,
@@ -24,7 +24,7 @@ package it.nextsw.common.interceptors;
 //    }
 //
 //    @Override
-//    public boolean onFlushDirty(Object entity,
+//    public boolean onFlushDirty(Object entities,
 //            Serializable id,
 //            Object[] currentState,
 //            Object[] previousState,
@@ -35,7 +35,7 @@ package it.nextsw.common.interceptors;
 //    }
 //
 //    @Override
-//    public boolean onLoad(Object entity,
+//    public boolean onLoad(Object entities,
 //            Serializable id,
 //            Object[] state,
 //            String[] propertyNames,
@@ -45,7 +45,7 @@ package it.nextsw.common.interceptors;
 //    }
 //
 //    @Override
-//    public boolean onSave(Object entity,
+//    public boolean onSave(Object entities,
 //            Serializable id,
 //            Object[] state,
 //            String[] propertyNames,
