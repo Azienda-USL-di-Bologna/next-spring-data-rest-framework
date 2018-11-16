@@ -139,7 +139,8 @@ public class ProjectionsInterceptorLauncher {
                     }
                 } else { // altrimenti mi riconduco al caso base tornando direttamente l'oggetto ottenuto chiamando il metodo sull'entità (che teoricamente è più veloce)
                     entity = invoke;
-                    invoke.getClass().getMethod("getDescrizione").invoke(invoke);
+                    // Modificato da Giovanni (probabilmente un refuso di qualche test?)
+                    // invoke.getClass().getMethod("getDescrizione").invoke(invoke);
                 }
                 entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
                 if (entity != null) {
