@@ -6,17 +6,15 @@ import it.nextsw.common.persistence.entities.*;
 import it.nextsw.common.persistence.repository.AgenteRestRepository;
 import it.nextsw.common.persistence.repository.MercatoRiferimentoRestRepository;
 import it.nextsw.common.persistence.repository.SettoreOperativoRestRepository;
-import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestComponent;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-@TestComponent
+@Component
 public class CreateEntityService {
 
     @Autowired

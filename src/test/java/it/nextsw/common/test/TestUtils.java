@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.stereotype.Component;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -16,7 +17,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
 
-@TestComponent
+@Component
 public class TestUtils {
 
     @Autowired
