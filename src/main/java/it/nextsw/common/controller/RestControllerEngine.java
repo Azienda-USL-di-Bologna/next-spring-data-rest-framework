@@ -144,7 +144,7 @@ public abstract class RestControllerEngine {
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    protected Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
+    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
         // istanziazione del repository corretto
@@ -182,7 +182,7 @@ public abstract class RestControllerEngine {
                 Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entity);
                 Object id = primaryKeyGetMethod.invoke(entity);
                 if (id != null) {
-                    Object foundEntity = em.find(entityClass, id);
+                    Object foundEntity = retriveEntity(entityClass, id);
                     if (foundEntity != null) {
                         inserting = false;
                         entity = foundEntity;
@@ -238,7 +238,7 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         JpaRepository generalRepository;
         if (StringUtils.hasText(entityPath)) {
             generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
@@ -273,9 +273,9 @@ public abstract class RestControllerEngine {
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
      * @return
      * @throws RestControllerEngineException
-     * @throws it.nextsw.common.controller.exceptions.NotFoundResourceException
+     * @throws NotFoundResourceException
      */
-    protected Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
@@ -461,22 +461,43 @@ public abstract class RestControllerEngine {
         Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntityClass).getName());
         if (childEntity != null) {
             Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass).invoke(childEntity);
-            // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
-            if (!childEntityPKey.getClass().equals(valuePKey.getClass())) {
-                if (Number.class.isAssignableFrom(childEntityPKey.getClass())) {
-                    if (childEntityPKey.getClass().equals(Long.class))
-                        valuePKey = ((Number) valuePKey).longValue();
-                }
-            }
+
             // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
-            if (!childEntityPKey.equals(valuePKey)) {
-                childEntity = em.find(childEntityClass, valuePKey);
+            if (!isKeysEquals(childEntityPKey, valuePKey)) {
+                childEntity = retriveEntity(childEntityClass, valuePKey);
             }
         } else {
-            childEntity = em.find(childEntityClass, valuePKey);
+            childEntity = retriveEntity(childEntityClass, valuePKey);
         }
 
         return childEntity;
+    }
+
+    /**
+     * Il metodo dato la classe dell'entità e la sua chiave torna l'entità
+     * @param entityClass
+     * @param entityKey
+     * @return
+     */
+    protected Object retriveEntity(Class entityClass, Object entityKey) {
+        return em.find(entityClass, entityKey);
+    }
+
+    /**
+     * Metodo per confrontare due primary keys, una proviene dal json una dall'entità
+     * @param key1
+     * @param key2
+     * @return
+     */
+    protected boolean isKeysEquals(Object key1, Object key2){
+        // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
+        if (!key1.getClass().equals(key2.getClass())) {
+            if (Number.class.isAssignableFrom(key1.getClass())) {
+                if (key1.getClass().equals(Long.class))
+                    key2 = ((Number) key2).longValue();
+            }
+        }
+        return key1.equals(key2);
     }
 
     /**
@@ -540,7 +561,8 @@ public abstract class RestControllerEngine {
                             return true;
                         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
                         Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
-                        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                        Class childEntityClass = (Class) actualTypeArgument;
+
                         Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
                         Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
                         String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
@@ -722,7 +744,7 @@ public abstract class RestControllerEngine {
     protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
         Type actualTypeArgument = ((ParameterizedType) setMethod.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+        Class childEntityClass = (Class) actualTypeArgument;
 
         // contiene i valori passati
         Collection<Map<String, Object>> childValues = value;
@@ -765,7 +787,7 @@ public abstract class RestControllerEngine {
                     childEntity = childEntityOp.get();
                 } else {
                     // se la trovo sul DB allora la associo all'entità
-                    childEntity = em.find(childEntityClass, childValuePk);
+                    childEntity = retriveEntity(childEntityClass, childValuePk);
                     if (childEntity == null) { // se non c'è sul DB allora ne creerò una nuova
                         inserting = true;
                         childEntity = childEntityClass.getConstructor().newInstance();
@@ -970,7 +992,7 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         for (BatchOperation batchOperation : data) {
             switch (batchOperation.getOperation()) {
                 case INSERT:
@@ -1042,7 +1064,7 @@ public abstract class RestControllerEngine {
      * @param additionalData la stringa da parsare
      * @return
      */
-    protected Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
+    public Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
             return Splitter.on(",").withKeyValueSeparator("=").split(additionalData);
         } else {
@@ -1066,7 +1088,7 @@ public abstract class RestControllerEngine {
      * @throws RestControllerEngineException
      */
     @Transactional(readOnly = true)
-    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
+    public Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
         Class projectionClass;
         /*
