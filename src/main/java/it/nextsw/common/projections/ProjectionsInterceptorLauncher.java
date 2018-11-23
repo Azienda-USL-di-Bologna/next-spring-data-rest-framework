@@ -228,12 +228,13 @@ public class ProjectionsInterceptorLauncher {
 
             // Eseguo l'interceptor after select.
             entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
+            //TODO usare collection di default e non la WithPlainFields
             Class<?> projectionClass = projectionsMap.get(returnTypeEntityName + "WithPlainFields"); // Applico la projection base ad ognuno dei risultati della query
             if (List.class.isAssignableFrom(entitiesFound.getClass())) {
-                entities = (List) StreamSupport.stream(entitiesFound.spliterator(), false)
+                entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
                         .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());
             } else {
-                entities = (List) StreamSupport.stream(entitiesFound.spliterator(), false)
+                entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
                         .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
             }
             threadLocalParams.get().entityMap.put(pred.toString(), entities);

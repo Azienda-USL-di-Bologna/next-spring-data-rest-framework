@@ -105,7 +105,7 @@ public class EntityReflectionUtils {
      * classe Entity
      *
      * @param proxyEntity
-     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * @return la classe entities vero e proprio a partire dalle classi proxy
      * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
@@ -119,7 +119,7 @@ public class EntityReflectionUtils {
      * classe Entity
      *
      * @param proxyEntityClass
-     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * @return la classe entities vero e proprio a partire dalle classi proxy
      * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
@@ -199,12 +199,12 @@ public class EntityReflectionUtils {
         String filterFieldName = null;
 
         // se l'annotazione è OneToMany allora il filterFieldName si ottiene dal mappedBy
-        OneToMany oneToManyAnnotation = field.getAnnotationsByType(OneToMany.class)[0];
+        OneToMany oneToManyAnnotation = Arrays.stream(field.getAnnotationsByType(OneToMany.class)).findFirst().orElse(null);
         if (oneToManyAnnotation != null) {
             filterFieldName = oneToManyAnnotation.mappedBy();
         } else {
             // se l'annotazione è ManyToMany ci sono 2 casi, se c'è il mappedBy, allora il filterFieldName si ottiene da esso
-            ManyToMany manyToManyAnnotation = field.getAnnotationsByType(ManyToMany.class)[0];
+            ManyToMany manyToManyAnnotation = Arrays.stream(field.getAnnotationsByType(ManyToMany.class)).findFirst().orElse(null);
             if (manyToManyAnnotation != null) {
                 if (manyToManyAnnotation.mappedBy() != null && !manyToManyAnnotation.mappedBy().isEmpty()) {
                     filterFieldName = manyToManyAnnotation.mappedBy();
@@ -218,7 +218,7 @@ public class EntityReflectionUtils {
                 else {
                     Field[] TargetClassFields = targetEntityClass.getDeclaredFields();
                     for (Field targetField : TargetClassFields) {
-                        ManyToMany annotation = targetField.getAnnotationsByType(ManyToMany.class)[0];
+                        ManyToMany annotation = Arrays.stream(targetField.getAnnotationsByType(ManyToMany.class)).findFirst().orElse(null);
                         if (annotation.mappedBy().equals(field.getName())) {
                             filterFieldName = targetField.getName();
                             break;

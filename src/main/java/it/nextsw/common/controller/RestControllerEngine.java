@@ -100,7 +100,7 @@ public abstract class RestControllerEngine {
     protected Map<String, Class> projectionsMap;
 
     /**
-     * metodo che restituisce, se esiste, l'entity richiesta prendendola dal
+     * metodo che restituisce, se esiste, l'entities richiesta prendendola dal
      * repository
      *
      * @param id
@@ -133,7 +133,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Inserimento di una nuova entity
+     * Inserimento di una nuova entities
      *
      * @param data           - dati grezzi passati nella richiesta
      * @param request
@@ -144,7 +144,7 @@ public abstract class RestControllerEngine {
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    protected Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
+    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
         // istanziazione del repository corretto
@@ -182,11 +182,11 @@ public abstract class RestControllerEngine {
                 Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entity);
                 Object id = primaryKeyGetMethod.invoke(entity);
                 if (id != null) {
-                    Object foundEntity = em.find(entityClass, id);
+                    Object foundEntity = retriveEntity(entityClass, id);
                     if (foundEntity != null) {
                         inserting = false;
                         entity = foundEntity;
-//                        beforeUpdateEntity = objectMapper.convertValue(entity, entityClass);
+//                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
                         beforeUpdateEntity = cloneEntity(entity);
                     }
                 }
@@ -227,7 +227,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Cancellazione di un'entity
+     * Cancellazione di un'entities
      *
      * @param id             - id dell'entità da eliminare
      * @param request
@@ -238,7 +238,7 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         JpaRepository generalRepository;
         if (StringUtils.hasText(entityPath)) {
             generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
@@ -263,7 +263,7 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Aggiornamento di un'entity esistente
+     * Aggiornamento di un'entities esistente
      *
      * @param id
      * @param data
@@ -273,9 +273,9 @@ public abstract class RestControllerEngine {
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
      * @return
      * @throws RestControllerEngineException
-     * @throws it.nextsw.common.controller.exceptions.NotFoundResourceException
+     * @throws NotFoundResourceException
      */
-    protected Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
@@ -461,22 +461,43 @@ public abstract class RestControllerEngine {
         Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntityClass).getName());
         if (childEntity != null) {
             Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass).invoke(childEntity);
-            // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
-            if (!childEntityPKey.getClass().equals(valuePKey.getClass())) {
-                if (Number.class.isAssignableFrom(childEntityPKey.getClass())) {
-                    if (childEntityPKey.getClass().equals(Long.class))
-                        valuePKey = ((Number) valuePKey).longValue();
-                }
-            }
+
             // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
-            if (!childEntityPKey.equals(valuePKey)) {
-                childEntity = em.find(childEntityClass, valuePKey);
+            if (!isKeysEquals(childEntityPKey, valuePKey)) {
+                childEntity = retriveEntity(childEntityClass, valuePKey);
             }
         } else {
-            childEntity = em.find(childEntityClass, valuePKey);
+            childEntity = retriveEntity(childEntityClass, valuePKey);
         }
 
         return childEntity;
+    }
+
+    /**
+     * Il metodo dato la classe dell'entità e la sua chiave torna l'entità
+     * @param entityClass
+     * @param entityKey
+     * @return
+     */
+    protected Object retriveEntity(Class entityClass, Object entityKey) {
+        return em.find(entityClass, entityKey);
+    }
+
+    /**
+     * Metodo per confrontare due primary keys, una proviene dal json una dall'entità
+     * @param key1
+     * @param key2
+     * @return
+     */
+    protected boolean isKeysEquals(Object key1, Object key2){
+        // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
+        if (!key1.getClass().equals(key2.getClass())) {
+            if (Number.class.isAssignableFrom(key1.getClass())) {
+                if (key1.getClass().equals(Long.class))
+                    key2 = ((Number) key2).longValue();
+            }
+        }
+        return key1.equals(key2);
     }
 
     /**
@@ -540,7 +561,8 @@ public abstract class RestControllerEngine {
                             return true;
                         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
                         Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
-                        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+                        Class childEntityClass = (Class) actualTypeArgument;
+
                         Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
                         Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
                         String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
@@ -661,7 +683,7 @@ public abstract class RestControllerEngine {
     protected void manageArrayMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
         /*
          * Viene creato un array che contiere oggetti del tipo
-         * identificato dal campo nell'entity; una volta creato
+         * identificato dal campo nell'entities; una volta creato
          * l'array viene popolato con i valori passati nella
          * richiesta.
          */
@@ -722,7 +744,7 @@ public abstract class RestControllerEngine {
     protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
         Type actualTypeArgument = ((ParameterizedType) setMethod.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+        Class childEntityClass = (Class) actualTypeArgument;
 
         // contiene i valori passati
         Collection<Map<String, Object>> childValues = value;
@@ -765,7 +787,7 @@ public abstract class RestControllerEngine {
                     childEntity = childEntityOp.get();
                 } else {
                     // se la trovo sul DB allora la associo all'entità
-                    childEntity = em.find(childEntityClass, childValuePk);
+                    childEntity = retriveEntity(childEntityClass, childValuePk);
                     if (childEntity == null) { // se non c'è sul DB allora ne creerò una nuova
                         inserting = true;
                         childEntity = childEntityClass.getConstructor().newInstance();
@@ -898,7 +920,7 @@ public abstract class RestControllerEngine {
             // se si passa "fk_" con id null, vuol dire che voglio settare a null la fk per cui lascio l'oggetto fkReference a null
             if (fk.getId() != null) {
                 /*
-                 * viene creata l'entità tramite entity manager in modo che
+                 * viene creata l'entità tramite entities manager in modo che
                  * hibernate capisca che non la deve inserire
                  */
                 fkReference = em.getReference(fkField.getType(), fk.getId());
@@ -970,7 +992,7 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         for (BatchOperation batchOperation : data) {
             switch (batchOperation.getOperation()) {
                 case INSERT:
@@ -998,14 +1020,20 @@ public abstract class RestControllerEngine {
     protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
 
-        if (withId) {
-            int slashPos = repositoryKey.lastIndexOf("/");
-            if (slashPos != -1) {
-                repositoryKey = repositoryKey.substring(0, slashPos);
-            }
+//        if (withId) {
+//            int slashPos = repositoryKey.lastIndexOf("/");
+//            if (slashPos != -1) {
+//                repositoryKey = repositoryKey.substring(0, slashPos);
+//            }
+//        }
+//        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
+        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
+            return request.getServletPath().toLowerCase().contains(s);
+        }).findFirst().orElse(null);
+        if (repoKey == null) {
+            new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
         }
-        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
-        return generalRepository;
+        return customRepositoryPathMap.get(repoKey);
     }
 
     /**
@@ -1036,7 +1064,7 @@ public abstract class RestControllerEngine {
      * @param additionalData la stringa da parsare
      * @return
      */
-    protected Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
+    public Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
             return Splitter.on(",").withKeyValueSeparator("=").split(additionalData);
         } else {
@@ -1060,7 +1088,7 @@ public abstract class RestControllerEngine {
      * @throws RestControllerEngineException
      */
     @Transactional(readOnly = true)
-    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
+    public Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
         Class projectionClass;
         /*
@@ -1069,7 +1097,7 @@ public abstract class RestControllerEngine {
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
-        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entity sulle projections
+        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entities sulle projections
         projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
 
         /*
@@ -1109,7 +1137,7 @@ public abstract class RestControllerEngine {
             Optional<Object> entityOptional = generalRepository.findOne(findByIdExpression);
             // controllo della presenza del risultato
             if (entityOptional.isPresent()) {
-                // si ottiene la entity
+                // si ottiene la entities
                 Object entity = entityOptional.get();
                 try {
                     // applicazione di afterSelectQueryInterceptor
@@ -1132,7 +1160,7 @@ public abstract class RestControllerEngine {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
                 /*
-                 * si spacchetta la Page che contiene le entity e si passa il
+                 * si spacchetta la Page che contiene le entities e si passa il
                  * tutto all'interceptor; una volta applicato l'interceptor
                  * viene ricreata la Page
                  */

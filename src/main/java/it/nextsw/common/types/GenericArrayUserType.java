@@ -10,7 +10,7 @@ import java.util.Properties;
 import org.hibernate.usertype.ParameterizedType;
 
 /**
- * classe generica da utilizzare per tipizzate i campi array su entity
+ * classe generica da utilizzare per tipizzate i campi array su entities
  *
  * @author gdm e spritz
  * @param <T>
@@ -90,7 +90,7 @@ public class GenericArrayUserType<T extends Serializable> implements UserType, P
             Array array = null;
             /**
              * crea un array del tipo passato come parametro nell'annotazione
-             * sull'entity. Ad esempio se nel campo dell'entity si ha:
+             * sull'entities. Ad esempio se nel campo dell'entities si ha:
              *
              * @Type(type = "array", parameters = @Parameter(name =
              * "elements-type", value = GenericArrayUserType.TEXT_ELEMENT_TYPE))

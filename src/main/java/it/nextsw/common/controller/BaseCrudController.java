@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * @author gdm
  */
-public abstract class BaseCrudController extends RestControllerEngine {
+public abstract class BaseCrudController {
 
     private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
 
@@ -33,7 +33,7 @@ public abstract class BaseCrudController extends RestControllerEngine {
             HttpServletRequest request,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
-        Object entity = super.insert(data, request, parseAdditionalDataIntoMap(additionalData), null, false);
+        Object entity = getRestControllerEngine().insert(data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
@@ -46,7 +46,7 @@ public abstract class BaseCrudController extends RestControllerEngine {
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException {
         log.info("executing update operation...");
         try {
-            Object update = super.update(id, data, request, parseAdditionalDataIntoMap(additionalData), null, false);
+            Object update = getRestControllerEngine().update(id, data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false);
             return new ResponseEntity(update, HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -63,7 +63,7 @@ public abstract class BaseCrudController extends RestControllerEngine {
         log.info("executing delete operation...");
 
         try {
-            super.delete(id, request, parseAdditionalDataIntoMap(additionalData), null, false);
+            getRestControllerEngine().delete(id, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false);
             return new ResponseEntity(HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -77,11 +77,18 @@ public abstract class BaseCrudController extends RestControllerEngine {
             HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
         try {
             log.info("executing batch operation...");
-            batch(data, request);
+            getRestControllerEngine().batch(data, request);
 //            return new ResponseEntity(HttpStatus.OK);
         }
         catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
             throw ex;
         }
     }
+
+    /**
+     * Ritorna un'istanza di {@link RestControllerEngine}
+     * che verrà utilizzato dai metodi per la modifica dell'entità di questo controller
+     * @return
+     */
+    public abstract RestControllerEngine getRestControllerEngine();
 }
