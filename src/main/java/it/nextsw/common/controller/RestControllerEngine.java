@@ -34,7 +34,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.logging.Level;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -61,7 +60,7 @@ import org.springframework.util.StringUtils;
  */
 public abstract class RestControllerEngine {
 
-    private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
+    private final Logger LOGGER = LoggerFactory.getLogger(RestControllerEngine.class);
 
 
     @Autowired
@@ -140,11 +139,12 @@ public abstract class RestControllerEngine {
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
-     * @return l'entità inserita, con la projection base applicata
+     * @param projection     la projection da applicare al dato ritnorato
+     * @return l'entità inserita, con la projection passata applicata. Se non passata viene applicata quella base
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
+    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
         // istanziazione del repository corretto
@@ -171,7 +171,7 @@ public abstract class RestControllerEngine {
              */
             if (EntityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
                 String pkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
-                log.warn(String.format("trovato campo %s con valore %s, lo elimino dai dati...", pkFieldName, data.get(pkFieldName)));
+                LOGGER.warn(String.format("trovato campo %s con valore %s, lo elimino dai dati...", pkFieldName, data.get(pkFieldName)));
                 data.remove(pkFieldName);
             } else {
                 /*
@@ -217,7 +217,7 @@ public abstract class RestControllerEngine {
              */
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
-                Class projectionClass = getProjectionClass(null, generalRepository);
+                Class projectionClass = getProjectionClass(projection, generalRepository);
                 entity = factory.createProjection(projectionClass, entity);
             }
             return entity;
@@ -258,7 +258,7 @@ public abstract class RestControllerEngine {
         } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         } catch (SkipDeleteInterceptorException ex) {
-            log.info("eliminazione annullata dall'interceptor", ex);
+            LOGGER.info("eliminazione annullata dall'interceptor", ex);
         }
     }
 
@@ -271,11 +271,12 @@ public abstract class RestControllerEngine {
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
-     * @return
+     * @param projection     projection da applicare all'entità tornata dopo l'update
+     * @return               l'entità modificata con la projection passata applicata. Se non passata viene applicata quella base
      * @throws RestControllerEngineException
      * @throws NotFoundResourceException
      */
-    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
@@ -310,7 +311,7 @@ public abstract class RestControllerEngine {
              */
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
-                Class projectionClass = getProjectionClass(null, generalRepository);
+                Class projectionClass = getProjectionClass(projection, generalRepository);
                 res = factory.createProjection(projectionClass, res);
             }
 
@@ -872,7 +873,7 @@ public abstract class RestControllerEngine {
                     try {
                         launchNestedBefereDeleteInterceptor(deletedEntity, request, additionalDataMap);
                     } catch (SkipDeleteInterceptorException ex) {
-                        log.info("delete saltato come richiesto", ex);
+                        LOGGER.info("delete saltato come richiesto", ex);
                     }
                 }
             }
@@ -996,10 +997,10 @@ public abstract class RestControllerEngine {
         for (BatchOperation batchOperation : data) {
             switch (batchOperation.getOperation()) {
                 case INSERT:
-                    insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
+                    insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     break;
                 case UPDATE:
-                    update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
+                    update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     break;
                 case DELETE:
                     delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
