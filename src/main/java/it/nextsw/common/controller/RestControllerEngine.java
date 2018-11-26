@@ -357,12 +357,11 @@ public abstract class RestControllerEngine {
                 Method setMethod = null;
                 Method getMethod = null;
                 Field field = null;
-                try {          
+                try {
                     field = EntityReflectionUtils.getDeclaredField(entityClass, key);
                     setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
                     getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
-                }
-                catch (Exception ex) {
+                } catch (Exception ex) {
                 }
                 if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
                     if (value != null) {
@@ -377,10 +376,12 @@ public abstract class RestControllerEngine {
                             /*
                              * caso in cui l'elemento è un'entità singola,
                              * richiamo ricorsivamente il merge sull'oggetto.
-                            */
+                             */
                             manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageEnumMerge(entity, value, setMethod);
+                        } else if (Number.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                            manageNumericMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else {
                             /*
                              * tutti gli altri casi, cioè l'elemento è un tipo
@@ -475,6 +476,7 @@ public abstract class RestControllerEngine {
 
     /**
      * Il metodo dato la classe dell'entità e la sua chiave torna l'entità
+     *
      * @param entityClass
      * @param entityKey
      * @return
@@ -485,11 +487,12 @@ public abstract class RestControllerEngine {
 
     /**
      * Metodo per confrontare due primary keys, una proviene dal json una dall'entità
+     *
      * @param key1
      * @param key2
      * @return
      */
-    protected boolean isKeysEquals(Object key1, Object key2){
+    protected boolean isKeysEquals(Object key1, Object key2) {
         // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
         if (!key1.getClass().equals(key2.getClass())) {
             if (Number.class.isAssignableFrom(key1.getClass())) {
@@ -503,12 +506,13 @@ public abstract class RestControllerEngine {
     /**
      * Controlla se l'entità sarà modificata
      * NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+     *
      * @param entity
      * @param values
      * @return
-     * @throws Exception 
+     * @throws Exception
      */
-    
+
     protected boolean willBeEntityModified(Object entity, Map<String, Object> values) throws Exception {
         for (String key : values.keySet()) {
             Object value = values.get(key);
@@ -517,8 +521,7 @@ public abstract class RestControllerEngine {
             try {
                 field = EntityReflectionUtils.getDeclaredField(entity.getClass(), key);
                 getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
             }
             if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
                 Object valueEntity = getMethod.invoke(entity);
@@ -542,22 +545,19 @@ public abstract class RestControllerEngine {
                         }
                         if (!dateTime.equals(valueEntity))
                             return true;
-                    }
-                    else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
+                    } else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
                         Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
                         if (!Arrays.equals((Object[]) valueEntity, array))
                             return true;
-                    }
-                    else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)){
+                    } else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)) {
                         boolean changedChild = willBeEntityModified(valueEntity, (Map<String, Object>) value);
                         if (changedChild)
                             return true;
-                    }
-                    else if (Collection.class.isAssignableFrom(valueEntityClass)){
+                    } else if (Collection.class.isAssignableFrom(valueEntityClass)) {
                         Collection collectionValue = (Collection) value;
-                        Collection collectionEntity = (Collection)valueEntity;
-    //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
-                        if (collectionValue.size()!= collectionEntity.size())
+                        Collection collectionEntity = (Collection) valueEntity;
+                        //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
+                        if (collectionValue.size() != collectionEntity.size())
                             return true;
                         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
                         Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
@@ -566,7 +566,7 @@ public abstract class RestControllerEngine {
                         Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
                         Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
                         String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
-                        for (Object valueElement :  collectionValue){
+                        for (Object valueElement : collectionValue) {
                             Object valueElementPk = ((Map<String, Object>) valueElement).get(childValuePrimaryKeyFieldName);
                             Object childEntityElement = collectionEntity.stream().filter(
                                     e -> {
@@ -592,7 +592,7 @@ public abstract class RestControllerEngine {
                         }
                     }
                     // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
-                    else if(String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
+                    else if (String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
@@ -600,14 +600,14 @@ public abstract class RestControllerEngine {
                     // questo if gestisce tutti gli altri casi che verosimilmente saranno i tipi base e i tipi primitivi
                     // NB: nel caso di classi custom è necessario l'implementazione del metodo equals
                     else if (!value.equals(valueEntity)) {
-                         return true;
+                        return true;
                     }
                 }
             }
         }
         return false;
     }
-    
+
     protected boolean isJsonParsable(String value) {
         try {
             JsonNode valueJsonNode = objectMapper.readTree((String) value);
@@ -634,6 +634,39 @@ public abstract class RestControllerEngine {
         setMethod.invoke(entity, (Object) null);
     }
 
+    /**
+     * Gestisce il merge in caso di proprietà {@link Number}
+     * questo metodo funziona e viene richiamato solo per classi Wrapper (Integer, Long, etc..)
+     * non viene richiamato nel caso di tipi primitivi (int, long, etc...)
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param value
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageNumericMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        Class setClass = setMethod.getParameterTypes()[0];
+        Number valueNumber = (Number) value;
+        if (Integer.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.intValue();
+        else if (Long.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.longValue();
+        else if (Float.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.floatValue();
+        else if (Double.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.doubleValue();
+        else if (Short.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.shortValue();
+        else if (Byte.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.byteValue();
+
+        setMethod.invoke(entity, valueNumber);
+    }
 
     /**
      * Gestisce la merge in tutti gli altri casi, essenzialmente chiama l'invoke sul set per settare il value.
@@ -797,12 +830,12 @@ public abstract class RestControllerEngine {
                 inserting = true;
                 childEntity = childEntityClass.getConstructor().newInstance();
             }
-            
+
             /*
              * Siccome gli oggetti della lista sono per forza figli dell'entità padre, togliamo gli eventuali riferimenti
              * all'entità padre e settiamo forzatamente quello giusto.
              * Es. se stiamo agendo sull'entità Azienda con id = 1 e nella lista troviamo:
-             * [ 
+             * [
              *  {
              *      "nome": "gdm",
              *      "cognome": dmg,
@@ -817,7 +850,7 @@ public abstract class RestControllerEngine {
              *          "id": 3,
              *      "nome": "Ausl Parma"
              *      }
-             *  } 
+             *  }
              * ]
              * devo rimuovere dalla prima entità l'oggetto "fk_idAzienda" e dalla seconda l'oggetto "idAzienda",
              * perché si riferiscono a un'azienda diversa da quella di cui la lista è figlia
@@ -1027,7 +1060,7 @@ public abstract class RestControllerEngine {
 //            }
 //        }
 //        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
-        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
+        String repoKey = customRepositoryPathMap.keySet().stream().filter(s -> {
             return request.getServletPath().toLowerCase().contains(s);
         }).findFirst().orElse(null);
         if (repoKey == null) {
