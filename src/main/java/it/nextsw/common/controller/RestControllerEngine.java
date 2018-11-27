@@ -1021,21 +1021,38 @@ public abstract class RestControllerEngine {
     protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
 
-//        if (withId) {
-//            int slashPos = repositoryKey.lastIndexOf("/");
-//            if (slashPos != -1) {
-//                repositoryKey = repositoryKey.substring(0, slashPos);
-//            }
-//        }
-//        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
-        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
-            return request.getServletPath().toLowerCase().contains(s);
-        }).findFirst().orElse(null);
-        if (repoKey == null) {
-            new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
+        if (withId) {
+            int slashPos = repositoryKey.lastIndexOf("/");
+            if (slashPos != -1) {
+                repositoryKey = repositoryKey.substring(0, slashPos);
+            }
         }
-        return customRepositoryPathMap.get(repoKey);
+        
+        if (repositoryKey == null) {
+            throw new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
+        }
+        return customRepositoryPathMap.get(repositoryKey);
     }
+    
+    /**
+     * Trova il repositori a partire dalla request usando la servletPath per individuarlo (non funziona nel caso di richiesta batch)
+     *
+     * @param request
+     * @param withId  passare "true" se la richiesta contiene /id
+     * @return
+     * @throws RestControllerEngineException
+     */
+//    protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
+//        String repositoryKey = request.getServletPath();
+//
+//        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
+//            return request.getServletPath().toLowerCase().contains(s);
+//        }).findFirst().orElse(null);
+//        if (repoKey == null) {
+//            new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
+//        }
+//        return customRepositoryPathMap.get(repoKey);
+//    }
 
     /**
      * Trova la classe projection a partire dal nome passato come parametro.
