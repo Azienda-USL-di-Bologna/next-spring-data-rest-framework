@@ -48,9 +48,9 @@ public class ForeignKeyExporter {
         NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
         NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
 
-        String baseUrl = commonUtils.resolvePlaceHolder(annotation.baseUrl());
+        String path = commonUtils.resolvePlaceHolder(annotation.repositoryPath());
         String hostName = commonUtils.getHostname(currentRequest);
-        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + baseUrl + "/" + annotation.repositoryPath();
+        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + path;
 
         return url;
     }
