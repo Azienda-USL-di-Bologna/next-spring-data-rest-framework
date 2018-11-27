@@ -592,6 +592,12 @@ public abstract class RestControllerEngine {
                             }
                         }
                     }
+                    // nel caso in cui sia un Number prima converto il valore della mappa nel Number corretto
+                    else if (Number.class.isAssignableFrom(valueEntityClass)) {
+                        Number convertedValue = convertToRightNumberClass((Number) value, valueEntityClass);
+                        if (!convertedValue.equals(valueEntity))
+                            return true;
+                    }
                     // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
                     else if (String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
@@ -652,7 +658,19 @@ public abstract class RestControllerEngine {
      */
     protected void manageNumericMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
         Class setClass = setMethod.getParameterTypes()[0];
-        Number valueNumber = (Number) value;
+        Number valueNumber = convertToRightNumberClass((Number) value, setClass);
+
+        setMethod.invoke(entity, valueNumber);
+    }
+
+    /**
+     * Converte il number passato come parametro nella classe indicata da setClass
+     * @param value
+     * @param setClass
+     * @return il number castato
+     */
+    protected Number convertToRightNumberClass(Number value, Class<? extends Number> setClass) {
+        Number valueNumber = value;
         if (Integer.class.isAssignableFrom(setClass))
             valueNumber = valueNumber.intValue();
         else if (Long.class.isAssignableFrom(setClass))
@@ -665,8 +683,7 @@ public abstract class RestControllerEngine {
             valueNumber = valueNumber.shortValue();
         else if (Byte.class.isAssignableFrom(setClass))
             valueNumber = valueNumber.byteValue();
-
-        setMethod.invoke(entity, valueNumber);
+        return valueNumber;
     }
 
     /**
