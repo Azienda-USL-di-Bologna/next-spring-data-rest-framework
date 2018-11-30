@@ -216,10 +216,11 @@ public class EntityReflectionUtils {
                  *
                  */
                 else {
-                    Field[] TargetClassFields = targetEntityClass.getDeclaredFields();
-                    for (Field targetField : TargetClassFields) {
+                    Field[] targetClassFields = targetEntityClass.getDeclaredFields();
+                    for (Field targetField : targetClassFields) {
                         ManyToMany annotation = Arrays.stream(targetField.getAnnotationsByType(ManyToMany.class)).findFirst().orElse(null);
-                        if (annotation.mappedBy().equals(field.getName())) {
+                        if (annotation != null && annotation.mappedBy()!=null &&
+                                annotation.mappedBy().equals(field.getName())) {
                             filterFieldName = targetField.getName();
                             break;
                         }
