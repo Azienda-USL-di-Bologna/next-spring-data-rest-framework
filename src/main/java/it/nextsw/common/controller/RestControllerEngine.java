@@ -1078,7 +1078,7 @@ public abstract class RestControllerEngine {
             }
         }
         
-        if (repositoryKey == null) {
+        if (repositoryKey == null || !customRepositoryPathMap.containsKey(repositoryKey)) {
             throw new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
         }
         return customRepositoryPathMap.get(repositoryKey);
