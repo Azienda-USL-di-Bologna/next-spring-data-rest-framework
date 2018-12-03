@@ -89,11 +89,13 @@ public class ForeignKeyExporter {
                  */
                 String filterFieldName = EntityReflectionUtils.getFilterFieldName(field, targetEntityClass);
 
-                Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
-                Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
-                id = primaryKeyGetMethod.invoke(SourceEntity);
-                targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                if (filterFieldName != null) {
+                    Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
+                    Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
+                    id = primaryKeyGetMethod.invoke(SourceEntity);
+                    targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
+                    fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                }
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");
