@@ -876,13 +876,17 @@ public abstract class RestControllerEngine {
 
             // filterFieldName mi da il nome del campo interessato (nell'esempio precedente "idAzienda")
             String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
-            // vado a rimuovere dal json passato i campi interessati
-            ((Map) ((Map) childValue)).remove(filterFieldName);
-            ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
-            // trovo il metodo set per settare sull'entità l'oggetto padre
-            Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
-            // setto sull'entità l'oggetto padre corretto (che è appunto l'entità padre, dalla quale ho tirato fuori la collection)
-            setParentFkMethod.invoke(childEntity, entity);
+            
+            // se non trovo filterFieldName lascio perdere questo controllo
+            if (filterFieldName != null) {
+                // vado a rimuovere dal json passato i campi interessati
+                ((Map) ((Map) childValue)).remove(filterFieldName);
+                ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
+                // trovo il metodo set per settare sull'entità l'oggetto padre
+                Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
+                // setto sull'entità l'oggetto padre corretto (che è appunto l'entità padre, dalla quale ho tirato fuori la collection)
+                setParentFkMethod.invoke(childEntity, entity);
+            }
 
             Object beforeUpdateEntity = null;
             boolean willBeEntityModified = false;
