@@ -48,9 +48,9 @@ public class ForeignKeyExporter {
         NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
         NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
 
-        String baseUrl = commonUtils.resolvePlaceHolder(annotation.baseUrl());
+        String path = commonUtils.resolvePlaceHolder(annotation.repositoryPath());
         String hostName = commonUtils.getHostname(currentRequest);
-        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + baseUrl + "/" + annotation.repositoryPath();
+        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + path;
 
         return url;
     }
@@ -89,11 +89,13 @@ public class ForeignKeyExporter {
                  */
                 String filterFieldName = EntityReflectionUtils.getFilterFieldName(field, targetEntityClass);
 
-                Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
-                Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
-                id = primaryKeyGetMethod.invoke(SourceEntity);
-                targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                if (filterFieldName != null) {
+                    Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
+                    Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
+                    id = primaryKeyGetMethod.invoke(SourceEntity);
+                    targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
+                    fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                }
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");

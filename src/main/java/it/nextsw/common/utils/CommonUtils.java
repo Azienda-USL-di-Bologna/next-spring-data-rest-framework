@@ -53,7 +53,7 @@ public class CommonUtils {
         }
 
         if (value != null) {
-            return env.getProperty(value);
+            return property.replaceAll(pattern, env.getProperty(value));
         } else {
             return property;
         }
