@@ -253,7 +253,7 @@ public abstract class RestControllerEngine {
 
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         try {
-            launchNestedBefereDeleteInterceptor(entity, request, additionalData);
+            launchNestedBefereDeleteInterceptor(entity, request, additionalData, new HashMap());
             generalRepository.delete(entity);
         } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
@@ -925,7 +925,7 @@ public abstract class RestControllerEngine {
             if (!deletedEntities.isEmpty()) {
                 for (Object deletedEntity : deletedEntities) {
                     try {
-                        launchNestedBefereDeleteInterceptor(deletedEntity, request, additionalDataMap);
+                        launchNestedBefereDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap());
                     } catch (SkipDeleteInterceptorException ex) {
                         LOGGER.info("delete saltato come richiesto", ex);
                     }
@@ -1018,7 +1018,11 @@ public abstract class RestControllerEngine {
      * @throws IllegalArgumentException
      * @throws InvocationTargetException
      */
-    private void launchNestedBefereDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+    private void launchNestedBefereDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        if (alreadyChecked == null) {
+            alreadyChecked = new HashMap();
+        }
+        alreadyChecked.put(EntityReflectionUtils.getEntityFromProxyObject(entity).getCanonicalName(), true);
         Field[] fields = entity.getClass().getDeclaredFields();
         if (fields != null && fields.length > 0) {
             for (Field field : fields) {
@@ -1027,8 +1031,11 @@ public abstract class RestControllerEngine {
                 if (EntityReflectionUtils.isForeignKeyField(field) && Collection.class.isAssignableFrom(field.getType())) {
                     Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), field.getName());
                     Collection childEntityCollection = (Collection) getMethod.invoke(entity);
-                    for (Object childEntity : childEntityCollection) {
-                        launchNestedBefereDeleteInterceptor(childEntity, request, additionalData);
+                    String entityToCheck = ((ParameterizedType) getMethod.getAnnotatedReturnType().getType()).getActualTypeArguments()[0].getTypeName();
+                    if (!alreadyChecked.containsKey(entityToCheck) || !alreadyChecked.get(entityToCheck)) {
+                        for (Object childEntity : childEntityCollection) {
+                            launchNestedBefereDeleteInterceptor(childEntity, request, additionalData, alreadyChecked);
+                        }
                     }
                 }
             }
