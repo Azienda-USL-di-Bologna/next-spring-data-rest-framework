@@ -1005,7 +1005,8 @@ public abstract class RestControllerEngine {
 
     /**
      * lancia gli interceptor "beforeDelete" sull'entità passata e su tutte le entità figlie
-     *
+     * TODO: nei casi di molti a molti lancia l'interceptor su entità che non vengono eliminare 
+     * (nel senso che dovrebbe scattare solo se saranno effettivamente eliminate, bisognerebbe guardare il cascade per decidere se deve scattare oppure no)
      * @param entity
      * @param request
      * @param additionalData
