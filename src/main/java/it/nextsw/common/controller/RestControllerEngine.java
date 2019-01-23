@@ -275,8 +275,9 @@ public abstract class RestControllerEngine {
      * @return               l'entità modificata con la projection passata applicata. Se non passata viene applicata quella base
      * @throws RestControllerEngineException
      * @throws NotFoundResourceException
+     * @throws AbortSaveInterceptorException
      */
-    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException, AbortSaveInterceptorException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 

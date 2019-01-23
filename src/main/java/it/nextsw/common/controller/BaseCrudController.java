@@ -45,7 +45,7 @@ public abstract class BaseCrudController {
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException {
+            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing update operation...");
         try {
             Object update = getRestControllerEngine().update(id, data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
