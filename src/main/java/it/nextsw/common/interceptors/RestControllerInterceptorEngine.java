@@ -98,6 +98,19 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
+    public Object executeafterCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+//        fillInterceptorsCache();
+        log.info(String.format("find %s interceptors on %s...", "afterCreateEntityInterceptor", entity.toString()));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
+        if (interceptors != null) {
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                log.info(String.format("execute %s on %s", "afgerCreateEntityInterceptor", entity.toString()));
+                entity = interceptor.afterCreateEntityInterceptor(entity, additionalData, request);
+            }
+        }
+        return entity;
+    }
+
     public Object executebeforeUpdateInterceptor(Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
         log.info(String.format("find %s interceptors on %s...", "beforeUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
@@ -110,6 +123,18 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
+    public Object executeafterUpdateInterceptor(Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+        log.info(String.format("find %s interceptors on %s...", "afterUpdateEntityInterceptor", entity.toString()));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
+        if (interceptors != null) {
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                log.info(String.format("execute %s on %s", "afterUpdateEntityInterceptor", entity.toString()));
+                entity = interceptor.afterUpdateEntityInterceptor(entity, beforeUpdateEntity, additionalData, request);
+            }
+        }
+        return entity;
+    }
+
     public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
         log.info(String.format("find %s interceptors on %s...", "beforeDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
@@ -117,6 +142,18 @@ public class RestControllerInterceptorEngine {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
                 log.info(String.format("execute %s on %s", "beforeDeleteEntityInterceptor", entity.toString()));
                 interceptor.beforeDeleteEntityInterceptor(entity, additionalData, request);
+            }
+        }
+        return entity;
+    }
+
+    public Object executeafterDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
+        log.info(String.format("find %s interceptors on %s...", "afterDeleteEntityInterceptor", entity.toString()));
+        List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
+        if (interceptors != null) {
+            for (NextSdrControllerInterceptor interceptor : interceptors) {
+                log.info(String.format("execute %s on %s", "afterDeleteEntityInterceptor", entity.toString()));
+                interceptor.afterDeleteEntityInterceptor(entity, additionalData, request);
             }
         }
         return entity;

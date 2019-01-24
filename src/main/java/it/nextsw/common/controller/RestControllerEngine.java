@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
+import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Splitter;
@@ -211,6 +212,13 @@ public abstract class RestControllerEngine {
             // salvataggio dell'entità
             generalRepository.save(entity);
 
+            // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
+            if (inserting) {
+                entity = restControllerInterceptor.executeafterCreateInterceptor(entity, request, additionalData);
+            } else {
+                entity = restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
+            }
+
             /*
              * viene ritornata l'entità inserita con tutti i campi, compreso l'id generato, con la projection base applicata,
              * ma nel caso di batch non applico la projection
@@ -253,8 +261,9 @@ public abstract class RestControllerEngine {
 
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         try {
-            launchNestedBefereDeleteInterceptor(entity, request, additionalData, new HashMap());
+            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE);
             generalRepository.delete(entity);
+            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.AFTER);
         } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         } catch (SkipDeleteInterceptorException ex) {
@@ -305,6 +314,9 @@ public abstract class RestControllerEngine {
                 restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
 
                 generalRepository.save(res);
+
+                // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
+                restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
             }
             /*
              * viene ritornata l'entità inserita con tutti i campi, compreso l'id generato, con la projection base applicata,
@@ -926,7 +938,7 @@ public abstract class RestControllerEngine {
             if (!deletedEntities.isEmpty()) {
                 for (Object deletedEntity : deletedEntities) {
                     try {
-                        launchNestedBefereDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap());
+                        launchNestedDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE);
                     } catch (SkipDeleteInterceptorException ex) {
                         LOGGER.info("delete saltato come richiesto", ex);
                     }
@@ -1020,7 +1032,7 @@ public abstract class RestControllerEngine {
      * @throws IllegalArgumentException
      * @throws InvocationTargetException
      */
-    private void launchNestedBefereDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+    private void launchNestedDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked, NextSdrControllerInterceptor.InterceptorType interceptorType) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         if (alreadyChecked == null) {
             alreadyChecked = new HashMap();
         }
@@ -1036,13 +1048,16 @@ public abstract class RestControllerEngine {
                     String entityToCheck = ((ParameterizedType) getMethod.getAnnotatedReturnType().getType()).getActualTypeArguments()[0].getTypeName();
                     if (!alreadyChecked.containsKey(entityToCheck) || !alreadyChecked.get(entityToCheck)) {
                         for (Object childEntity : childEntityCollection) {
-                            launchNestedBefereDeleteInterceptor(childEntity, request, additionalData, alreadyChecked);
+                            launchNestedDeleteInterceptor(childEntity, request, additionalData, alreadyChecked, interceptorType);
                         }
                     }
                 }
             }
         }
-        restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalData);
+        if (interceptorType == NextSdrControllerInterceptor.InterceptorType.BEFORE)
+            restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalData);
+        else
+            restControllerInterceptor.executeafterDeleteInterceptor(entity, request, additionalData);
     }
 
     /**
