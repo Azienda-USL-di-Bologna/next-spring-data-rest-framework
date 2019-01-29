@@ -891,7 +891,7 @@ public abstract class RestControllerEngine {
             String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
             
             // se non trovo filterFieldName lascio perdere questo controllo
-            if (filterFieldName != null) {
+            if (filterFieldName != null && !filterFieldName.equals("")) {
                 // vado a rimuovere dal json passato i campi interessati
                 ((Map) ((Map) childValue)).remove(filterFieldName);
                 ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
