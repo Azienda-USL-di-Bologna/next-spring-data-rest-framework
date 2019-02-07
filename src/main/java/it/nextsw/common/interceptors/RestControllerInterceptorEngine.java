@@ -38,12 +38,12 @@ public class RestControllerInterceptorEngine {
     @Qualifier(value = "interceptorsMap")
     protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
 
-    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData) throws AbortLoadInterceptorException, ClassNotFoundException, EntityReflectionException {
+    public Predicate executeBeforeSelectQueryInterceptor(Predicate initialPredicate, Class entityClass, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity) throws AbortLoadInterceptorException, ClassNotFoundException, EntityReflectionException {
 //        fillInterceptorsCache();
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyClass(entityClass));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
-                initialPredicate = interceptor.beforeSelectQueryInterceptor(initialPredicate, additionalData, request);
+                initialPredicate = interceptor.beforeSelectQueryInterceptor(initialPredicate, additionalData, request, mainEntity);
             }
         }
         return initialPredicate;
@@ -135,25 +135,25 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
+    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
         log.info(String.format("find %s interceptors on %s...", "beforeDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
                 log.info(String.format("execute %s on %s", "beforeDeleteEntityInterceptor", entity.toString()));
-                interceptor.beforeDeleteEntityInterceptor(entity, additionalData, request);
+                interceptor.beforeDeleteEntityInterceptor(entity, additionalData, request, mainEntity);
             }
         }
         return entity;
     }
 
-    public Object executeafterDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
+    public Object executeafterDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
         log.info(String.format("find %s interceptors on %s...", "afterDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
                 log.info(String.format("execute %s on %s", "afterDeleteEntityInterceptor", entity.toString()));
-                interceptor.afterDeleteEntityInterceptor(entity, additionalData, request);
+                interceptor.afterDeleteEntityInterceptor(entity, additionalData, request, mainEntity);
             }
         }
         return entity;
