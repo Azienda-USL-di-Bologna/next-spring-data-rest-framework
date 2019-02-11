@@ -204,7 +204,7 @@ public abstract class RestControllerEngine {
              * per cui in caso di inserimento effettivo lancio l'intereptor beforeInsert, altrimenti l'interceptor beforeUpdate.
              */
             if (inserting) {
-                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData);
+                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData, true);
             } else {
                 entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
             }
@@ -454,7 +454,7 @@ public abstract class RestControllerEngine {
             beforeUpdateEntity = cloneEntity(childEntity);
         childEntity = merge(value, childEntity, request, additionalDataMap);
         if (inserting) {
-            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
+            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false);
         } else if (willBeEntityModified)
             childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
         setMethod.invoke(entity, childEntity);
@@ -912,7 +912,7 @@ public abstract class RestControllerEngine {
             childEntity = merge(childValue, childEntity, request, additionalDataMap);
 
             if (inserting) {
-                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
+                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false);
             } else if (willBeEntityModified) {
                 childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
             }

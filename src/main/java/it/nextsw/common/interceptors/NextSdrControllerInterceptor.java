@@ -69,7 +69,7 @@ public interface NextSdrControllerInterceptor {
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException;
+    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di insert di un'entità
