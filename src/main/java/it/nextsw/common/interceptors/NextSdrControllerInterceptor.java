@@ -34,10 +34,12 @@ public interface NextSdrControllerInterceptor {
      * @param initialPredicate il predicato così come arriva al webservices
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
+     * @param mainEntity indica se l'interceptor è eseguito sull'entità principale su cui è stata fatta la richiesta o
+     *                   su una entità che compare come correlata
      * @return il predicato da utilizzare per eseguire la query
      * @throws AbortLoadInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request) throws AbortLoadInterceptorException;
+    public Predicate beforeSelectQueryInterceptor(Predicate initialPredicate, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity) throws AbortLoadInterceptorException;
 
     /**
      * Questo metodo viene eseguito subito dopo la query nel caso la query torni più di un risultato.In questo metodo è possibile fare un post filtraggio sui risultati
@@ -67,7 +69,7 @@ public interface NextSdrControllerInterceptor {
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException;
+    public Object beforeCreateEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di insert di un'entità
@@ -111,7 +113,7 @@ public interface NextSdrControllerInterceptor {
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      * @throws it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException se viene lanciata questa eccezione la transazione prosegue, ma l'oggetto non viene eliminato
      */
-    public void beforeDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException, SkipDeleteInterceptorException;
+    public void beforeDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity) throws AbortSaveInterceptorException, SkipDeleteInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di delete di un'entità
@@ -121,6 +123,6 @@ public interface NextSdrControllerInterceptor {
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      * @throws it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException se viene lanciata questa eccezione la transazione prosegue, ma l'oggetto non viene eliminato
      */
-    public void afterDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request) throws AbortSaveInterceptorException, SkipDeleteInterceptorException;
+    public void afterDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity) throws AbortSaveInterceptorException, SkipDeleteInterceptorException;
 
 }

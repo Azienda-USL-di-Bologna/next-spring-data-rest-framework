@@ -204,7 +204,7 @@ public abstract class RestControllerEngine {
              * per cui in caso di inserimento effettivo lancio l'intereptor beforeInsert, altrimenti l'interceptor beforeUpdate.
              */
             if (inserting) {
-                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData);
+                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData, true);
             } else {
                 entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
             }
@@ -261,9 +261,9 @@ public abstract class RestControllerEngine {
 
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         try {
-            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE);
+            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE, true);
             generalRepository.delete(entity);
-            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.AFTER);
+            launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.AFTER, true);
         } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         } catch (SkipDeleteInterceptorException ex) {
@@ -454,7 +454,7 @@ public abstract class RestControllerEngine {
             beforeUpdateEntity = cloneEntity(childEntity);
         childEntity = merge(value, childEntity, request, additionalDataMap);
         if (inserting) {
-            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
+            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false);
         } else if (willBeEntityModified)
             childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
         setMethod.invoke(entity, childEntity);
@@ -891,7 +891,7 @@ public abstract class RestControllerEngine {
             String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
             
             // se non trovo filterFieldName lascio perdere questo controllo
-            if (filterFieldName != null) {
+            if (filterFieldName != null && !filterFieldName.equals("")) {
                 // vado a rimuovere dal json passato i campi interessati
                 ((Map) ((Map) childValue)).remove(filterFieldName);
                 ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
@@ -912,7 +912,7 @@ public abstract class RestControllerEngine {
             childEntity = merge(childValue, childEntity, request, additionalDataMap);
 
             if (inserting) {
-                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
+                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false);
             } else if (willBeEntityModified) {
                 childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
             }
@@ -938,7 +938,7 @@ public abstract class RestControllerEngine {
             if (!deletedEntities.isEmpty()) {
                 for (Object deletedEntity : deletedEntities) {
                     try {
-                        launchNestedDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE);
+                        launchNestedDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE, false);
                     } catch (SkipDeleteInterceptorException ex) {
                         LOGGER.info("delete saltato come richiesto", ex);
                     }
@@ -1032,7 +1032,8 @@ public abstract class RestControllerEngine {
      * @throws IllegalArgumentException
      * @throws InvocationTargetException
      */
-    private void launchNestedDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked, NextSdrControllerInterceptor.InterceptorType interceptorType) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+    private void launchNestedDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked,
+                                               NextSdrControllerInterceptor.InterceptorType interceptorType, boolean mainEntity) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
         if (alreadyChecked == null) {
             alreadyChecked = new HashMap();
         }
@@ -1048,16 +1049,16 @@ public abstract class RestControllerEngine {
                     String entityToCheck = ((ParameterizedType) getMethod.getAnnotatedReturnType().getType()).getActualTypeArguments()[0].getTypeName();
                     if (!alreadyChecked.containsKey(entityToCheck) || !alreadyChecked.get(entityToCheck)) {
                         for (Object childEntity : childEntityCollection) {
-                            launchNestedDeleteInterceptor(childEntity, request, additionalData, alreadyChecked, interceptorType);
+                            launchNestedDeleteInterceptor(childEntity, request, additionalData, alreadyChecked, interceptorType, false);
                         }
                     }
                 }
             }
         }
         if (interceptorType == NextSdrControllerInterceptor.InterceptorType.BEFORE)
-            restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalData);
+            restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalData, mainEntity);
         else
-            restControllerInterceptor.executeafterDeleteInterceptor(entity, request, additionalData);
+            restControllerInterceptor.executeafterDeleteInterceptor(entity, request, additionalData, mainEntity);
     }
 
     /**
@@ -1213,7 +1214,7 @@ public abstract class RestControllerEngine {
 
         try {
             // inserimento come predicato dell'eventuale interceptor
-            predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap);
+            predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap, true);
         } catch (ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException(ex);
         }
