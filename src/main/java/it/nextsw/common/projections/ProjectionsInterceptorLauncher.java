@@ -146,8 +146,8 @@ public class ProjectionsInterceptorLauncher {
                     // Modificato da Giovanni (probabilmente un refuso di qualche test?)
                     // invoke.getClass().getMethod("getDescrizione").invoke(invoke);
                 }
-                entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
                 if (entity != null) {
+                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
                     // TODO: forse andrebbe applicata la projection di default inserita nell'apposita nostra annotazione del repository?
                     if (!StringUtils.hasText(projectionToUse))
                         projectionToUse = entityFromProxyClass.getSimpleName() + "WithPlainFields";
@@ -235,22 +235,27 @@ public class ProjectionsInterceptorLauncher {
                 entitiesFound = (Collection) targetEntityClass.getMethod(methodName).invoke(target);
             }
 
-            // Eseguo l'interceptor after select.
-            entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
-            //TODO usare collection di default e non la WithPlainFields
-            if (!StringUtils.hasText(projectionToUse))
-                projectionToUse = returnTypeEntityName + "WithPlainFields";
-            Class<?> projectionClass = projectionsMap.get(projectionToUse); // Applico la projection base ad ognuno dei risultati della query
-            if (List.class.isAssignableFrom(entitiesFound.getClass())) {
-                entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
-                        .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());
+            if (entities != null) {
+                // Eseguo l'interceptor after select.
+                entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
+                //TODO usare collection di default e non la WithPlainFields
+                if (!StringUtils.hasText(projectionToUse))
+                    projectionToUse = returnTypeEntityName + "WithPlainFields";
+                Class<?> projectionClass = projectionsMap.get(projectionToUse); // Applico la projection base ad ognuno dei risultati della query
+                if (List.class.isAssignableFrom(entitiesFound.getClass())) {
+                    entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
+                            .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());
+                } else {
+                    entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
+                            .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
+                }
+                threadLocalParams.get().entityMap.put(pred.toString(), entities);
             } else {
-                entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
-                        .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
+                threadLocalParams.get().entityMap.put(pred.toString(), "null");
             }
-            threadLocalParams.get().entityMap.put(pred.toString(), entities);
+        } else if (entities.getClass().isAssignableFrom(String.class) && entities.toString().equals("null")) {
+            entities = null;
         }
-
         return entities;
     }
 }
