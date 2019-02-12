@@ -235,7 +235,7 @@ public class ProjectionsInterceptorLauncher {
                 entitiesFound = (Collection) targetEntityClass.getMethod(methodName).invoke(target);
             }
 
-            if (entities != null) {
+            if (entitiesFound != null) {
                 // Eseguo l'interceptor after select.
                 entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
                 //TODO usare collection di default e non la WithPlainFields
@@ -250,11 +250,7 @@ public class ProjectionsInterceptorLauncher {
                             .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toSet());
                 }
                 threadLocalParams.get().entityMap.put(pred.toString(), entities);
-            } else {
-                threadLocalParams.get().entityMap.put(pred.toString(), "null");
             }
-        } else if (entities.getClass().isAssignableFrom(String.class) && entities.toString().equals("null")) {
-            entities = null;
         }
         return entities;
     }
