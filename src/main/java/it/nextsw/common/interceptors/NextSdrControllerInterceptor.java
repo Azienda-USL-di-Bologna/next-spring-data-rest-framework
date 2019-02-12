@@ -5,7 +5,6 @@ import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
-import org.omg.PortableInterceptor.Interceptor;
 
 import java.util.Collection;
 import java.util.Map;
