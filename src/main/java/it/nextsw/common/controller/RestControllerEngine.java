@@ -769,14 +769,21 @@ public abstract class RestControllerEngine {
      * @throws InvocationTargetException
      */
     protected void manageDateMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
-        LocalDateTime dateTime;
-        try {
-            // giorno e ora
-            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        } catch (Exception ex) {
-            // solo giorno
-            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+        Object dateTime;
+        
+        Class<?> dateType = setMethod.getParameterTypes()[0];
+        if (dateType.isAssignableFrom(LocalDateTime.class)) {
+            try {
+                dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
+            }
+        } else {
+            try {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            }
         }
         value = dateTime;
         setMethod.invoke(entity, value);
