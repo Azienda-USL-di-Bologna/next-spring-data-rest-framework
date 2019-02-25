@@ -44,13 +44,14 @@ public class ForeignKeyExporter {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.
                         currentRequestAttributes()).getRequest();
-
+        String url = null;
         NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
-        NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
-
-        String path = commonUtils.resolvePlaceHolder(annotation.repositoryPath());
-        String hostName = commonUtils.getHostname(currentRequest);
-        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + path;
+        if (targetEntityRepository != null) {
+            NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
+            String path = commonUtils.resolvePlaceHolder(annotation.repositoryPath());
+            String hostName = commonUtils.getHostname(currentRequest);
+            url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + path;
+        }
 
         return url;
     }
@@ -94,7 +95,10 @@ public class ForeignKeyExporter {
                     Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
                     id = primaryKeyGetMethod.invoke(SourceEntity);
                     targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                    fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                    String buildedUrl = buildUrl(targetEntityClass);
+                    if (buildedUrl != null) {
+                        fullUrl = String.format("%s?%s.%s=%s", buildedUrl, filterFieldName, primaryKeyField.getName(), id);
+                    }
                 }
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
