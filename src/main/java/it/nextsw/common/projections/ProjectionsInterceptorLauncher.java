@@ -194,6 +194,7 @@ public class ProjectionsInterceptorLauncher {
         // Come returnType voglio il tipo dell'entità all'interno del Set/List. Per trovarlo bisogna castare a ParameterizedType il risultato di getGenericReturnType() sul metodo trattato.
         Class returnType = (Class) ((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0];
         String returnTypeEntityName = returnType.getSimpleName();
+        boolean isReturnTypeCollection = Collection.class.isAssignableFrom((Class<?>) ((ParameterizedType) method.getGenericReturnType()).getRawType());
 
         NextSdrQueryDslRepository repo = customRepositoryEntityMap.get(returnType.getCanonicalName());
 
@@ -207,11 +208,16 @@ public class ProjectionsInterceptorLauncher {
         Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(target);  // Prendo il metodo per ottenere la PK
         Object id = primaryKeyGetMethod.invoke(target); // Questo è la PK dell'entity
 
+        PathBuilder pathBuilderPredicate =new PathBuilder(BooleanExpression.class,
+                CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, returnTypeEntityName));
         // Questo predicato corrisponde ad es. a: "QUtenteStruttura.utenteStruttura.idUtente.id.eq(id)"
-        Predicate pred = new PathBuilder(
-                BooleanExpression.class, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, returnTypeEntityName)).
-                get(filterFieldName).
-                get(primaryKeyField.getName()).eq(id);
+        Predicate pred = isReturnTypeCollection ?
+                ((PathBuilder)pathBuilderPredicate
+                        .getCollection(filterFieldName, returnType).any())
+                        .get(primaryKeyField.getName()).eq(id) :
+                pathBuilderPredicate
+                        .get(filterFieldName)
+                        .get(primaryKeyField.getName()).eq(id);
 
         // controllo se è stato implementato un interceptor before select
         boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(EntityReflectionUtils.getEntityFromProxyClass(returnType));
