@@ -120,12 +120,17 @@ public class ProjectionsInterceptorLauncher {
             // Mi prendo il repository dell'entità che sto espandendo. Come tipo inserisco NextSdrQueryDslRepository perché tutti i repositories la estendono.
             NextSdrQueryDslRepository repo = customRepositoryEntityMap.get(entityFromProxyClass.getCanonicalName());
 
+            // TODO: forse andrebbe applicata la projection di default inserita nell'apposita nostra annotazione del repository?
+            if (!StringUtils.hasText(projectionToUse))
+                projectionToUse = entityFromProxyClass.getSimpleName() + "WithPlainFields";
+            Class<?> projectionClass = projectionsMap.get(projectionToUse);  // Recupero la classe della projection con i campi base dell'entità interessata
+
             // controllo se è stato implementato un interceptor before select
             boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(entityFromProxyClass);
             //        boolean implementedBeforeQueryInterceptor = true;
             if (implementedBeforeQueryInterceptor) {
                 // se è implementato l'interceptor del before select il quale mi restitusce il predicato, eventualmente modificato, che userò per fare la query.
-                pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData, false);
+                pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData, false, projectionClass);
             }
 
             /* L'uso della entityMap serve a cacheare il risultato della query rispetto ad un definito predicato.
@@ -147,11 +152,8 @@ public class ProjectionsInterceptorLauncher {
                     // invoke.getClass().getMethod("getDescrizione").invoke(invoke);
                 }
                 if (entity != null) {
-                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData);   // Eseguo l'interceptor after select
-                    // TODO: forse andrebbe applicata la projection di default inserita nell'apposita nostra annotazione del repository?
-                    if (!StringUtils.hasText(projectionToUse))
-                        projectionToUse = entityFromProxyClass.getSimpleName() + "WithPlainFields";
-                    Class<?> projectionClass = projectionsMap.get(projectionToUse);  // Recupero la classe della projection con i campi base dell'entità interessata
+                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityFromProxyClass, threadLocalParams.get().request, threadLocalParams.get().additionalData, false, projectionClass);   // Eseguo l'interceptor after select
+
                     entity = factory.createProjection(projectionClass, entity); // Applico la projection con i campi base al risultato
                     threadLocalParams.get().entityMap.put(pred.toString(), entity);
                 } else {
@@ -222,9 +224,14 @@ public class ProjectionsInterceptorLauncher {
         // controllo se è stato implementato un interceptor before select
         boolean implementedBeforeQueryInterceptor = restControllerInterceptor.isImplementedBeforeQueryInterceptor(EntityReflectionUtils.getEntityFromProxyClass(returnType));
 
+        //TODO usare collection di default e non la WithPlainFields
+        if (!StringUtils.hasText(projectionToUse))
+            projectionToUse = returnTypeEntityName + "WithPlainFields";
+        Class<?> projectionClass = projectionsMap.get(projectionToUse); // Applico la projection base ad ognuno dei risultati della query
+
         // se lo è lo eseguo per modificare il predicato
         if (implementedBeforeQueryInterceptor) {
-            pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData, false);
+            pred = restControllerInterceptor.executeBeforeSelectQueryInterceptor(pred, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData, false, projectionClass);
         }
 
         // vedo se ho già l'entità nella mappa cache
@@ -243,11 +250,8 @@ public class ProjectionsInterceptorLauncher {
 
             if (entitiesFound != null) {
                 // Eseguo l'interceptor after select.
-                entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData);
-                //TODO usare collection di default e non la WithPlainFields
-                if (!StringUtils.hasText(projectionToUse))
-                    projectionToUse = returnTypeEntityName + "WithPlainFields";
-                Class<?> projectionClass = projectionsMap.get(projectionToUse); // Applico la projection base ad ognuno dei risultati della query
+                entitiesFound = (Collection) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, entitiesFound, returnType, threadLocalParams.get().request, threadLocalParams.get().additionalData, false, projectionClass);
+
                 if (List.class.isAssignableFrom(entitiesFound.getClass())) {
                     entities = (Collection) StreamSupport.stream(entitiesFound.spliterator(), false)
                             .map(l -> factory.createProjection(projectionClass, l)).collect(Collectors.toList());
