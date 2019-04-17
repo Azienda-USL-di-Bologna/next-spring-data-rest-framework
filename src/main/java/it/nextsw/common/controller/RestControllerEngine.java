@@ -450,7 +450,7 @@ public abstract class RestControllerEngine {
         }
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
-        if (willBeEntityModified)
+        if (willBeEntityModified && !inserting)
             beforeUpdateEntity = cloneEntity(childEntity);
         childEntity = merge(value, childEntity, request, additionalDataMap);
         if (inserting) {
@@ -481,7 +481,7 @@ public abstract class RestControllerEngine {
             if (!isKeysEquals(childEntityPKey, valuePKey)) {
                 childEntity = retriveEntity(childEntityClass, valuePKey);
             }
-        } else {
+        } else if (valuePKey != null) {
             childEntity = retriveEntity(childEntityClass, valuePKey);
         }
 
@@ -612,8 +612,9 @@ public abstract class RestControllerEngine {
                             return true;
                     }
                     // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
-                    else if (String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
-                        if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
+                    // NB: bisogna mettere valueEntity.toString() perché nel caso valueEntity sia un enum darebbe ClassCastException
+                    else if (String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity.toString())) {
+                        if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity.toString()))) {
                             return true;
                         }
                     }
