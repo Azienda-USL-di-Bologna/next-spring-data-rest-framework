@@ -97,20 +97,37 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     }
                     return Optional.of(res);
                 });
+        
+        bindings.bind(Enum.class).first((path, value) -> {
+            System.out.println("dentro");
+            return null; //To change body of generated lambdas, choose Tools | Templates.
+        });
 
         bindings.bind(String.class).all(
                 (StringPath path, Collection<? extends String> values) -> {
-                    final List<? extends String> strings = new ArrayList<>(values);
+                    final List<? extends Object> strings = new ArrayList<>(values);
                     Predicate res;
                     try {
                         if (values.isEmpty()) {
                             res = Expressions.asBoolean(true).isTrue();
                         } else if (values.size() == 1) {
-                            res = getStringPredicate(strings.get(0), path);
+                            String string;
+                            if (strings.get(0).getClass().isEnum()) {
+                                string = ((Enum) strings.get(0)).toString();
+                                res = path.eq(string);
+                            } else {
+                                string = (String) strings.get(0);
+                                res = getStringPredicate(string, path);
+                            }
                         } else {
                             BooleanBuilder b = new BooleanBuilder();
-                            for (String value : values) {
-                                b = b.or(getStringPredicate(value, path));
+                            for (Object value : values) {
+                                if (value.getClass().isEnum()) {
+                                    String string = ((Enum) value).toString();
+                                    b = b.or( path.eq(string));
+                                } else {
+                                    b = b.or(getStringPredicate((String) value, path));
+                                }
                             }
                             res = b;
                         }
