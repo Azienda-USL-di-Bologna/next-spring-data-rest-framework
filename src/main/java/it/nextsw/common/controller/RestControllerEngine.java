@@ -545,9 +545,17 @@ public abstract class RestControllerEngine {
                         return true;
 
                     Class valueEntityClass = field.getType();
-                    if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
-                        return true;
-                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                    if (valueEntityClass.isEnum() || valueEntity.getClass().isEnum()) {
+                        Enum enumValue;
+                        try { //nel caso si mette il campo sull'entità come stringa, ma nei getter e setter come enum, la riga seguente darrebbe errore, per cui usiamo il getter come tipo enum
+                            enumValue = Enum.valueOf(valueEntityClass, (String) value);
+                        } catch (Exception ex) {
+                            enumValue = Enum.valueOf((Class) valueEntity.getClass(), (String) value);
+                        }
+                        if (!enumValue.equals(valueEntity))
+                            return true;
+                    }
+                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) ||LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
                         LocalDateTime dateTime;
                         try {
                             // giorno e ora
