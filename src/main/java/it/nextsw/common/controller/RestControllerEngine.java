@@ -621,7 +621,11 @@ public abstract class RestControllerEngine {
                     }
                     // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
                     // NB: bisogna mettere valueEntity.toString() perché nel caso valueEntity sia un enum darebbe ClassCastException
-                    else if (String.class.isAssignableFrom(valueEntityClass) && !StringUtils.isEmpty(valueEntity) && isJsonParsable(valueEntity)) {
+                    else if (String.class.isAssignableFrom(valueEntityClass) && 
+                            !StringUtils.isEmpty(value) && 
+                            isJsonParsable(value) &&
+                            !StringUtils.isEmpty(valueEntity) && 
+                            isJsonParsable(valueEntity)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
