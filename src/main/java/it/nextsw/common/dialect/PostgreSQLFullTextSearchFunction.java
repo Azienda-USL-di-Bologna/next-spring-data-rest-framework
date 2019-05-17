@@ -43,6 +43,22 @@ public class PostgreSQLFullTextSearchFunction implements SQLFunction {
             value = value.substring(1, value.length() - 1);
             // al posto degli spazi metto le & per fare la ricerca in and e :* per trovare anche le parole che hanno la stringa come radice
             value = value.trim().replaceAll("\\s+", ":*&");
+            
+            // faccio l'escape dei caratteri speciali
+            value = value
+                    .replace("\\", "\\\\")
+                    .replace("!", "\\!")
+                    .replace("|", "\\|")
+                    .replace("'", "\\''")
+                    .replace(":", "\\:")
+                    .replace("&", "\\&")
+                    .replace("(", "\\(")
+                    .replace(")", "\\)")
+                    .replace("+", "\\+")
+                    .replace("<", "\\<");
+        }
+        if (value.trim().isEmpty()) {
+            value = "\\";
         }
         String tsCondition = " to_tsquery ('" + ftsConfig + "',$$" + value + ":*$$) @@ " + field;
         return tsCondition;
