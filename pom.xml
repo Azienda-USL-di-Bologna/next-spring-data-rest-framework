@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>it.nextsw</groupId>
     <artifactId>next-spring-data-rest-framework</artifactId>
-    <version>1.6.alfa</version>
+    <version>1.7.0.alfa</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -56,11 +56,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>jenesisprojections.generator</groupId>
-            <artifactId>jenesis-projections-generator</artifactId>
-            <version>1.1-SNAPSHOT</version>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-rest</artifactId>
             <version>${spring.boot.version}</version>
@@ -101,6 +96,12 @@
             <!--<version>5.3.3.Final</version>-->
         <!--</dependency>-->
 
+        <dependency>
+            <groupId>com.querydsl</groupId>
+            <artifactId>querydsl-apt</artifactId>
+            <version>${query.dsl.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- TEST  -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -121,11 +122,13 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.querydsl</groupId>
-            <artifactId>querydsl-apt</artifactId>
-            <version>${query.dsl.version}</version>
-            <scope>provided</scope>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.7.25</version>
+            <scope>test</scope>
         </dependency>
+
+
 
 
     </dependencies>
