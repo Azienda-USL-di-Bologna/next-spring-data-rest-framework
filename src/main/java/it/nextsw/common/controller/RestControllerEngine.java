@@ -480,7 +480,7 @@ public abstract class RestControllerEngine {
         }
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
-        if (willBeEntityModified)
+        if (willBeEntityModified && !inserting)
             beforeUpdateEntity = cloneEntity(childEntity);
         childEntity = merge(value, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass);
         if (inserting) {
@@ -516,7 +516,7 @@ public abstract class RestControllerEngine {
             if (!isKeysEquals(childEntityPKey, valuePKey)) {
                 childEntity = retriveEntity(childEntityClass, valuePKey);
             }
-        } else {
+        } else if (valuePKey != null) {
             childEntity = retriveEntity(childEntityClass, valuePKey);
         }
 
@@ -580,9 +580,17 @@ public abstract class RestControllerEngine {
                         return true;
 
                     Class valueEntityClass = field.getType();
-                    if (Enum.class.isAssignableFrom(valueEntityClass) && !Enum.valueOf(valueEntityClass, (String) value).equals(valueEntity))
-                        return true;
-                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) || LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                    if (valueEntityClass.isEnum() || valueEntity.getClass().isEnum()) {
+                        Enum enumValue;
+                        try { //nel caso si mette il campo sull'entità come stringa, ma nei getter e setter come enum, la riga seguente darrebbe errore, per cui usiamo il getter come tipo enum
+                            enumValue = Enum.valueOf(valueEntityClass, (String) value);
+                        } catch (Exception ex) {
+                            enumValue = Enum.valueOf((Class) valueEntity.getClass(), (String) value);
+                        }
+                        if (!enumValue.equals(valueEntity))
+                            return true;
+                    }
+                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) ||LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
                         LocalDateTime dateTime;
                         try {
                             // giorno e ora
@@ -647,7 +655,12 @@ public abstract class RestControllerEngine {
                             return true;
                     }
                     // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
-                    else if (String.class.isAssignableFrom(valueEntityClass) && isJsonParsable((String) valueEntity)) {
+                    // NB: bisogna mettere valueEntity.toString() perché nel caso valueEntity sia un enum darebbe ClassCastException
+                    else if (String.class.isAssignableFrom(valueEntityClass) && 
+                            !StringUtils.isEmpty(value) && 
+                            isJsonParsable(value) &&
+                            !StringUtils.isEmpty(valueEntity) && 
+                            isJsonParsable(valueEntity)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
@@ -663,11 +676,11 @@ public abstract class RestControllerEngine {
         return false;
     }
 
-    protected boolean isJsonParsable(String value) {
+    protected boolean isJsonParsable(Object value) {
         try {
             JsonNode valueJsonNode = objectMapper.readTree((String) value);
             return true;
-        } catch (IOException ex) {
+        } catch (IOException | ClassCastException ex) {
             return false;
         }
     }

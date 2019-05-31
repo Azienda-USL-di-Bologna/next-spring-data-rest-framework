@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.persistence.Column;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.querydsl.binding.QuerydslBinderCustomizer;
 import org.springframework.data.querydsl.binding.QuerydslBindings;
@@ -97,24 +98,60 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     }
                     return Optional.of(res);
                 });
+        
+        bindings.bind(Enum.class).first((path, value) -> {
+            System.out.println("dentro");
+            return null; //To change body of generated lambdas, choose Tools | Templates.
+        });
 
         bindings.bind(String.class).all(
                 (StringPath path, Collection<? extends String> values) -> {
-                    final List<? extends String> strings = new ArrayList<>(values);
+                    final List<? extends Object> strings = new ArrayList<>(values);
                     Predicate res;
                     try {
                         if (values.isEmpty()) {
                             res = Expressions.asBoolean(true).isTrue();
-                        } else if (values.size() == 1) {
-                            res = getStringPredicate(strings.get(0), path);
                         } else {
-                            BooleanBuilder b = new BooleanBuilder();
-                            for (String value : values) {
-                                b = b.or(getStringPredicate(value, path));
+                            /* gestione dei campi tsvector:
+                             * se sulla colonna dell'entità c'è l'annotazione Column e in columnDefinition contiene tsvector allora mi trovo in un campo tsvector
+                             * in quel caso la ricerca viene effettuata secondo la metodologia di ricerca ts di postgres. Viene richiamata la funzione fts_match
+                             *  che viene registrata creando in CustomDialect per hibernate (classe it.nextsw.common.dialect.CustomPostgresDialect).
+                             * Per il corretto funzionamento è necessatio abilitare il CustomDialect aggiungendo la seguente riga nell'application.properties del progetto:
+                             *  "spring.jpa.properties.hibernate.dialect=it.nextsw.common.dialect.CustomPostgresDialect"
+                            */
+                            String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                            if (columDefinition.contains("tsvector")) {
+                                BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", String.join(" ", (List<String>)strings)), 
+                                        path
+                                ); 
+                                res = booleanTemplate;
+                            } else {
+                                if (values.size() == 1) {
+                                    String string;
+                                    if (strings.get(0).getClass().isEnum()) {
+                                        string = ((Enum) strings.get(0)).toString();
+                                        res = path.eq(string);
+                                    } else {
+                                        string = (String) strings.get(0);
+                                        res = getStringPredicate(string, path);
+                                    }
+                                } else {
+                                    BooleanBuilder b = new BooleanBuilder();
+                                    for (Object value : values) {
+                                        if (value.getClass().isEnum()) {
+                                            String string = ((Enum) value).toString();
+                                            b = b.or( path.eq(string));
+                                        } else {
+                                            b = b.or(getStringPredicate((String) value, path));
+                                        }
+                                    }
+                                    res = b;
+                                }
                             }
-                            res = b;
                         }
                         return Optional.of(res);
+                        
                     } catch (InvalidFilterException ex) {
                         return Optional.of(Expressions.asBoolean(true).isTrue());
                     }
