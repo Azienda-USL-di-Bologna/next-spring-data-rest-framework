@@ -60,12 +60,13 @@ public abstract class BaseCrudController {
     public ResponseEntity<?> deleteResource(
             @PathVariable(required = true) Object id,
             HttpServletRequest request,
+            @RequestParam(required = false) String projection,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
         log.info("executing delete operation...");
 
         try {
-            getRestControllerEngine().delete(id, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false);
+            getRestControllerEngine().delete(id, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
             return new ResponseEntity(HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);

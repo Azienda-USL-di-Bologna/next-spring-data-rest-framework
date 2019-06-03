@@ -1,5 +1,7 @@
 package it.nextsw.common.utils;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
@@ -57,5 +59,11 @@ public class CommonUtils {
         } else {
             return property;
         }
+    }
+
+    public ArrayList getNewInstanceOfCollection(ArrayList coll){
+        ArrayList newColl = new ArrayList();
+        newColl.addAll(coll);
+        return  newColl;
     }
 }
