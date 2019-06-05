@@ -75,13 +75,13 @@ public abstract class BaseCrudController {
 
     @RequestMapping(value = {"batch"}, method = RequestMethod.POST)
     @Transactional(rollbackFor = {Throwable.class})
-    public void batchResources(
+    public ResponseEntity<?> batchResources(
             @RequestBody List<BatchOperation> data,
             HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
         try {
             log.info("executing batch operation...");
-            getRestControllerEngine().batch(data, request);
-//            return new ResponseEntity(HttpStatus.OK);
+            Object batch = getRestControllerEngine().batch(data, request);
+            return new ResponseEntity(batch, HttpStatus.OK);
         }
         catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
             throw ex;

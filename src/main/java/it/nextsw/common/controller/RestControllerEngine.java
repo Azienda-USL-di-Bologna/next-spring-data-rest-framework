@@ -1099,21 +1099,24 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    public String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {       
+        Object res = null;
         for (BatchOperation batchOperation : data) {
             switch (batchOperation.getOperation()) {
                 case INSERT:
-                    insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     break;
                 case UPDATE:
-                    update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     break;
                 case DELETE:
                     delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     break;
             }
         }
-        return objectMapper.writeValueAsString(data);
+        return data;
     }
 
     /**
