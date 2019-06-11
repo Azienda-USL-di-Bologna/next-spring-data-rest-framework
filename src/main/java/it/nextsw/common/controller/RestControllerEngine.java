@@ -1108,11 +1108,13 @@ public abstract class RestControllerEngine {
                 case INSERT:
                     res = insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
+                    projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
                     batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
                     break;
                 case UPDATE:
                     res = update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));                    
+                    projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
                     batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
                     break;
                 case DELETE:
