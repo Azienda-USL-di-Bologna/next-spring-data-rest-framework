@@ -157,7 +157,7 @@ public abstract class RestControllerEngine {
      */
     public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
-        launchedBeforeInterceptors = new ArrayList<ParameterizedInterceptor>();
+        launchedBeforeInterceptors = new ArrayList<>();
 
         // istanziazione del repository corretto
         JpaRepository generalRepository;
@@ -1102,14 +1102,18 @@ public abstract class RestControllerEngine {
     public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {       
         Object res = null;
         for (BatchOperation batchOperation : data) {
+            JpaRepository generalRepository = (JpaRepository) this.customRepositoryPathMap.get(batchOperation.getEntityPath());
+            Class projectionClass = getProjectionClass(batchOperation.getReturnProjection(), generalRepository);
             switch (batchOperation.getOperation()) {
                 case INSERT:
                     res = insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
-                    batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
+                    //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
+                    batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
                     break;
                 case UPDATE:
                     res = update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
-                    batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
+                    //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));                    
+                    batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
                     break;
                 case DELETE:
                     delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
