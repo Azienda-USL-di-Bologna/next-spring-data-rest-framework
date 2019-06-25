@@ -120,13 +120,33 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                              *  "spring.jpa.properties.hibernate.dialect=it.nextsw.common.dialect.CustomPostgresDialect"
                             */
                             String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
-                            if (columDefinition.contains("tsvector")) {
+                            if (columDefinition != null && columDefinition.contains("tsvector")) {
                                 BooleanExpression booleanTemplate = Expressions.booleanTemplate(
                                         String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", String.join(" ", (List<String>)strings)), 
                                         path
                                 ); 
                                 res = booleanTemplate;
-                            } else {
+                            } 
+//                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
+//                                if (strings.size() == 1) {
+//                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+//                                        String.format("FUNCTION('jsonb_match', {0}, '%s')= true", strings.get(0)), 
+//                                        path
+//                                    ); 
+//                                res = booleanTemplate;
+//                                } else {
+//                                    BooleanBuilder b = new BooleanBuilder();
+//                                    for (Object value: strings) {
+//                                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+//                                            String.format("FUNCTION('jsonb_match', {0}, '%s')= true", value,
+//                                            path
+//                                            ));
+//                                        b = b.or(booleanTemplate);
+//                                    }
+//                                    res = b;
+//                                }
+//                            } 
+                            else {
                                 if (values.size() == 1) {
                                     String string;
                                     if (strings.get(0).getClass().isEnum()) {

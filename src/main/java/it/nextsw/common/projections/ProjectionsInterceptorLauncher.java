@@ -24,6 +24,8 @@ import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -188,9 +190,37 @@ public class ProjectionsInterceptorLauncher {
      * @throws InterceptorException
      */
     public Collection lanciaInterceptorCollection(Object target, String methodName)throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
-        return lanciaInterceptorCollection(target, methodName,null);
+        return lanciaInterceptorCollection(target, methodName, null, null);
     }
-    public Collection lanciaInterceptorCollection(Object target, String methodName, String projectionToUse) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
+    
+    public Collection lanciaInterceptorCollection(Object target, String methodName, String projectionToUse)throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
+        return lanciaInterceptorCollection(target, methodName, projectionToUse, null);
+    }
+    
+    /**
+     * serve per poter avere la lista ordinata. Per usarla inserire l'annotazione tipo la seguente
+     *   @Value("#{@projectionsInterceptorLauncher.lanciaInterceptorCollection(target, 'getTagList', @projectionsInterceptorLauncher.buildSort('asc', 'type', 'description'))}")
+     *   @Override
+     *   public Object getTagList();
+     * @param target entità
+     * @param methodName nome del metodo sull'entità da usare che permette di ottenera la lista
+     * @param sort ordinamento da usare; usare il metodo buildSort di questa classe per creare l'oggetto Sort
+     * @return
+     * @throws EntityReflectionException
+     * @throws NoSuchMethodException
+     * @throws IllegalAccessException
+     * @throws IllegalArgumentException
+     * @throws InvocationTargetException
+     * @throws ClassNotFoundException
+     * @throws NoSuchFieldException
+     * @throws InterceptorException
+     * @throws AbortLoadInterceptorException 
+     */
+    public Collection lanciaInterceptorCollection(Object target, String methodName, Sort sort)throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
+        return lanciaInterceptorCollection(target, methodName, null, sort);
+    }
+    
+    public Collection lanciaInterceptorCollection(Object target, String methodName, String projectionToUse, Sort sort) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
         Class targetEntityClass = EntityReflectionUtils.getEntityFromProxyObject(target);
         Method method = targetEntityClass.getMethod(methodName);
         // Come returnType voglio il tipo dell'entità all'interno del Set/List. Per trovarlo bisogna castare a ParameterizedType il risultato di getGenericReturnType() sul metodo trattato.
@@ -240,9 +270,13 @@ public class ProjectionsInterceptorLauncher {
             Collection entitiesFound;
 //            List<NextSdrControllerInterceptor> interceptorsFound = restControllerInterceptor.getInterceptors(entityReflectionUtils.getEntityFromProxyClass(returnType));
             // se  go il predicato before selet implementato allora eseguo la query con il predicato calcolato prima
-            if (implementedBeforeQueryInterceptor) {
+            if (implementedBeforeQueryInterceptor || sort != null) {
 //                System.out.println("query!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                entitiesFound = (Collection) repo.findAll(pred); // Eseguo la query
+                if (sort != null) {
+                    entitiesFound = (Collection) repo.findAll(pred, sort); // Eseguo la query
+                } else {
+                    entitiesFound = (Collection) repo.findAll(pred); // Eseguo la query
+                }
             } else { // altrimenti mi riconduco al caso base eseguendo direttamente il metodo sull'entità (che teoricamente è più veloce)
 //                System.out.println("NNO query!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 entitiesFound = (Collection) targetEntityClass.getMethod(methodName).invoke(target);
@@ -263,5 +297,15 @@ public class ProjectionsInterceptorLauncher {
             }
         }
         return entities;
+    }
+    
+    /**
+     * crea un oggetto Sort secondo le proprietà passate
+     * @param direction: "asc" o "desc"
+     * @param properties nomi dei campi sull'entità per i quali ordinare
+     * @return un oggetto Sort secondo le proprietà passate
+     */
+    public Sort buildSort(String direction, String... properties) {
+        return new Sort(Sort.Direction.fromString(direction), properties);
     }
 }

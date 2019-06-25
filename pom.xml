@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>it.nextsw</groupId>
     <artifactId>next-spring-data-rest-framework</artifactId>
-    <version>1.7.0.alfa</version>
+    <version>1.8.0.alfa</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
