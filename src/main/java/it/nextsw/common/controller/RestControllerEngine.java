@@ -36,8 +36,10 @@ import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import javax.persistence.EntityManager;
+import javax.persistence.OptimisticLockException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 
@@ -361,13 +363,14 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Setta i valori presenti nella mappa "data" sull'entità preservando gli altri. Scende ricorsivamenti su tutti i figli e lancia i giusti interceptor
+     * Setta i valori presenti nella mappa "data" sull'entità preservando gli altri.Scende ricorsivamenti su tutti i figli e lancia i giusti interceptor
      *
      * @param data              la mappa dei valori da settare
      * @param entity            l'entità sulla quale settare i valori
      * @param request           la request
      * @param additionalDataMap la mappa degli additiol data passati nella rechiesta
      * @param getMethodPaths lista di metodi get da richiamare sull'entità principale per recuperare l'entità discendente su cui sto lavorando
+     * @param projectionClass
      * @return l'oggetto modificato
      * @throws RestControllerEngineException
      * @throws IllegalAccessException
@@ -386,7 +389,12 @@ public abstract class RestControllerEngine {
 
         Class entityClass = EntityReflectionUtils.getEntityFromProxyObject(entity);
         String entityPkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
+        
+        // se sull'entità è presente un campo con l'annotazione Version, fa il controllo delle versione tramite optimistic lock
+        checkVersion(entity, entityClass, entityPkFieldName, data);
+        
         boolean hasSerialPrimaryKey = EntityReflectionUtils.hasSerialPrimaryKey(entityClass);
+
         for (String key : data.keySet()) {
 
             Object value = data.get(key);
@@ -405,7 +413,7 @@ public abstract class RestControllerEngine {
                     getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
                 } catch (Exception ex) {
                 }
-                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
+                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
                     if (value != null) {
                         if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
                             manageDateMerge(entity, value, setMethod);
@@ -442,6 +450,51 @@ public abstract class RestControllerEngine {
         return entity;
     }
 
+    /**
+     * Se sull'entità è presente l'annotazione Version controlla che in "data" sia presente il campo "version":
+     *  se non c'è lancia eccezione;
+     *  se c'è e il valore è diverso da quello sull'entità lancia eccezione;
+     *  se sull'entità è null, salta il controllo.Se sull'entità non è presente l'annotazione Version, non fa nulla
+     * @param entity 
+     * @param entityClass
+     * @param pkFieldName
+     * @param data
+     * @throws IllegalAccessException
+     * @throws IllegalArgumentException
+     * @throws InvocationTargetException 
+     * @throws OptimisticLockException se i campi version non corrispondono oppure se l'entità ha il campo version, ma questo non è stato passato
+     */
+    protected void checkVersion(Object entity, Class entityClass, String pkFieldName, Map<String, Object> data) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        Field versionField = EntityReflectionUtils.getVersionField(entityClass);
+        if (versionField != null && 
+                /* se nell'entità c'è solo il campo chiave primario (oppure solo il campo chiave primario e il campo version) vuol dire 
+                 * che non sto modificando questa entità, ma al massimo sto cambiando la foreign key sull'entità padre, per cui salto il controllo
+                */
+                data.keySet().stream().anyMatch(key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName())))
+                ) {
+            Method getMethod = EntityReflectionUtils.getGetMethod(entityClass, versionField.getName());
+            Object entityVersionValue = getMethod.invoke(entity);
+            Object value = data.get(versionField.getName());
+//            if (entityVersionValue == null && value == null) {
+//                
+//            }
+            if (entityVersionValue != null) {
+                if (value != null) {
+                    Class<?> versionFieldType = versionField.getType();
+                    if (versionFieldType.isAssignableFrom(LocalDateTime.class)) {
+                        value = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+                        entityVersionValue = ((LocalDateTime)entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
+                    }
+
+                    if (!entityVersionValue.equals(value)) {
+                        throw new OptimisticLockException("i campi version non corrispondono");
+                    }
+                } else {
+                    throw new OptimisticLockException("l'entità ha il campo version, ma questo non è stato passato");
+                }
+            }
+        }
+    }
 
     /**
      * Gestione delle entità figlie durante il merge
@@ -572,7 +625,7 @@ public abstract class RestControllerEngine {
                 getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
             } catch (Exception ex) {
             }
-            if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrFkField(field)) {
+            if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
                 Object valueEntity = getMethod.invoke(entity);
                 if (value != valueEntity) {
                     // gestiamo casi null
@@ -1133,7 +1186,7 @@ public abstract class RestControllerEngine {
      * @return
      * @throws RestControllerEngineException
      */
-    protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
+    public NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
 
         if (withId) {

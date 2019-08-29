@@ -50,15 +50,27 @@ public class EntityReflectionUtils {
     }
 
     public static Field getPrimaryKeyField(Class entityClass) {
-        List<Field> declaredFields = new ArrayList(Arrays.asList(entityClass.getDeclaredFields()));
-        Class superclass = entityClass.getSuperclass();
+        return getFieldFromAnnotation(entityClass, Id.class);
+    }
+    
+    public static Field getVersionField(Class entityClass) {
+        return getFieldFromAnnotation(entityClass, Version.class);
+    }
+    
+    public static Field getFieldFromAnnotation(Class classz, Class annotationClass) {
+        if (!annotationClass.isAnnotation()) {
+            throw new RuntimeException(String.format("annotationClass deve essere un'annotazione"));
+        }
+        
+        List<Field> declaredFields = new ArrayList(Arrays.asList(classz.getDeclaredFields()));
+        Class superclass = classz.getSuperclass();
         while (superclass != null) {
             declaredFields.addAll(new ArrayList(Arrays.asList(superclass.getDeclaredFields())));
             superclass = superclass.getSuperclass();
         }
         Field res = null;
         for (Field declaredField : declaredFields) {
-            if (declaredField.getAnnotation(Id.class) != null) {
+            if (declaredField.getAnnotation(annotationClass) != null) {
                 res = declaredField;
                 break;
             }
@@ -94,9 +106,14 @@ public class EntityReflectionUtils {
         return annotation != null;
     }
     
-    public static boolean isColumnOrFkField(Field field) {
+    public static boolean isColumnOrVersionOrFkField(Field field) {
         java.lang.annotation.Annotation columnAnnotation = field.getAnnotation(Column.class);
-        return columnAnnotation != null || EntityReflectionUtils.isForeignKeyField(field);
+        return columnAnnotation != null || isVersionField(field) || EntityReflectionUtils.isForeignKeyField(field);
+    }
+    
+    public static boolean isVersionField(Field field) {
+        java.lang.annotation.Annotation versionAnnotation = field.getAnnotation(Version.class);
+        return versionAnnotation != null;
     }
 
     /**
@@ -284,7 +301,7 @@ public class EntityReflectionUtils {
      * @return
      */
     public static Method getSetMethod(Class entityClass, String fieldName)  {
-        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName),null);
+        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName), null);
         if (result != null)
             return result;
         else
