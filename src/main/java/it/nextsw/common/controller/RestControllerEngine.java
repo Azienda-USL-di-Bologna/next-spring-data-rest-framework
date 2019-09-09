@@ -1162,7 +1162,8 @@ public abstract class RestControllerEngine {
                     res = insert((Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
-                    batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    // batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case UPDATE:
                     res = update(batchOperation.getId(), (Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
