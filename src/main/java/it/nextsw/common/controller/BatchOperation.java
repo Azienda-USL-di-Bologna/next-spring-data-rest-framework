@@ -13,7 +13,7 @@ public class BatchOperation {
     private Object id;
     private String entityPath;
     private String returnProjection;
-    private Map<String, Object> entityBody;
+    private Object entityBody;
     private Map<String, String> additionalData;
 
     public BatchOperation() {
@@ -62,11 +62,11 @@ public class BatchOperation {
         this.returnProjection = returnProjection;
     }
 
-    public Map<String, Object> getEntityBody() {
+    public Object getEntityBody() {
         return entityBody;
     }
 
-    public void setEntityBody(Map<String, Object> entityBody) {
+    public void setEntityBody(Object entityBody) {
         this.entityBody = entityBody;
     }
 

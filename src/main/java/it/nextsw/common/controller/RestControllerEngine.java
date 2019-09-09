@@ -1159,16 +1159,17 @@ public abstract class RestControllerEngine {
             Class projectionClass = getProjectionClass(batchOperation.getReturnProjection(), generalRepository);
             switch (batchOperation.getOperation()) {
                 case INSERT:
-                    res = insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = insert((Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
-                    batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    // batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case UPDATE:
-                    res = update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = update(batchOperation.getId(), (Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));                    
                     projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
-                    batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case DELETE:
                     delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
