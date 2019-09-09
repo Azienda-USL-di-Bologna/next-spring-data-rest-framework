@@ -391,7 +391,7 @@ public abstract class RestControllerEngine {
         String entityPkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
         
         // se sull'entità è presente un campo con l'annotazione Version, fa il controllo delle versione tramite optimistic lock
-        // checkVersion(entity, entityClass, entityPkFieldName, data);
+        checkVersion(entity, entityClass, entityPkFieldName, data);
         
         boolean hasSerialPrimaryKey = EntityReflectionUtils.hasSerialPrimaryKey(entityClass);
 
