@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 public abstract class BaseCrudController {
 
-    private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
+    private final Logger log = LoggerFactory.getLogger(BaseCrudController.class);
 
     @RequestMapping(value = {"*"}, method = {RequestMethod.POST, RequestMethod.PUT})
     @Transactional(rollbackFor = {Throwable.class})
@@ -82,15 +82,15 @@ public abstract class BaseCrudController {
             log.info("executing batch operation...");
             Object batch = getRestControllerEngine().batch(data, request);
             return new ResponseEntity(batch, HttpStatus.OK);
-        }
-        catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
+        } catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
             throw ex;
         }
     }
 
     /**
-     * Ritorna un'istanza di {@link RestControllerEngine}
-     * che verrà utilizzato dai metodi per la modifica dell'entità di questo controller
+     * Ritorna un'istanza di {@link RestControllerEngine} che verrà utilizzato
+     * dai metodi per la modifica dell'entità di questo controller
+     *
      * @return
      */
     public abstract RestControllerEngine getRestControllerEngine();
