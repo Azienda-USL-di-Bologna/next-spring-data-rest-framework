@@ -35,6 +35,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -415,7 +416,7 @@ public abstract class RestControllerEngine {
                 }
                 if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
                     if (value != null) {
-                        if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
+                        if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class) || setMethod.getParameterTypes()[0].isAssignableFrom(ZonedDateTime.class)) {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
@@ -481,9 +482,9 @@ public abstract class RestControllerEngine {
             if (entityVersionValue != null) {
                 if (value != null) {
                     Class<?> versionFieldType = versionField.getType();
-                    if (versionFieldType.isAssignableFrom(LocalDateTime.class)) {
-                        value = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
-                        entityVersionValue = ((LocalDateTime)entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
+                    if (versionFieldType.isAssignableFrom(ZonedDateTime.class)) {
+                        value = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+                        entityVersionValue = ((ZonedDateTime)entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
                     }
 
                     if (!entityVersionValue.equals(value)) {
@@ -876,6 +877,12 @@ public abstract class RestControllerEngine {
         if (dateType.isAssignableFrom(LocalDateTime.class)) {
             try {
                 dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
+            }
+        } else if (dateType.isAssignableFrom(ZonedDateTime.class)) {
+            try {
+                dateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
             } catch (Exception ex) {
                 dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
             }
