@@ -628,10 +628,16 @@ public abstract class RestControllerEngine {
             }
             if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
                 Object valueEntity = getMethod.invoke(entity);
-                if (value != valueEntity) {
-                    // gestiamo casi null
-                    if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
-                        return true;
+                
+//                Class<?> versionFieldType = getMethod.getReturnType();
+//                if (versionFieldType.isAssignableFrom(ZonedDateTime.class)) {
+//                    value = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+//                    valueEntity = ((ZonedDateTime)valueEntity).truncatedTo(ChronoUnit.MILLIS);
+//                }
+                // gestiamo casi null
+                if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
+                    return true;
+                if (!(value == null && valueEntity == null) && !value.equals(valueEntity)) {
 
                     Class valueEntityClass = field.getType();
                     if (valueEntityClass.isEnum() || valueEntity.getClass().isEnum()) {
@@ -656,6 +662,12 @@ public abstract class RestControllerEngine {
                         }
                         if (!dateTime.equals(valueEntity))
                             return true;
+                    
+                    }else if (ZonedDateTime.class.isAssignableFrom(valueEntityClass)) {
+                        ZonedDateTime zonedDateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+                        valueEntity = ((ZonedDateTime)valueEntity).truncatedTo(ChronoUnit.MILLIS);
+                        if (!zonedDateTime.equals(valueEntity))
+                            return true;
                     } else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
                         Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
                         if (!Arrays.equals((Object[]) valueEntity, array))
@@ -669,6 +681,8 @@ public abstract class RestControllerEngine {
                         Collection collectionEntity = (Collection) valueEntity;
                         //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
                         if (collectionValue.size() != collectionEntity.size())
+                            // TODO: Qui il contorlolo andrebbe ampliato.
+                            // Solo se la lista ha l'orphan removal allora la differenza di size è davvero significativa
                             return true;
                         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
                         Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
