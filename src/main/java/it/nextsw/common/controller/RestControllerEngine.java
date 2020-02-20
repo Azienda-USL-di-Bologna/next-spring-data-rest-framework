@@ -669,7 +669,8 @@ public abstract class RestControllerEngine {
                         LocalDateTime dateTime;
                         try {
                             // giorno e ora
-                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.SECONDS);
+                            valueEntity = LocalDateTime.parse(valueEntity.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.SECONDS);
                         } catch (Exception ex) {
                             // solo giorno
                             //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
