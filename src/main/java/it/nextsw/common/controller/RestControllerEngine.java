@@ -13,6 +13,7 @@ import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.EntityPathBase;
 import com.querydsl.core.types.dsl.PathBuilder;
+import it.nextsw.common.annotations.NextSdrAncestor;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
@@ -43,6 +44,9 @@ import javax.persistence.EntityManager;
 import javax.persistence.OptimisticLockException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -213,7 +217,7 @@ public abstract class RestControllerEngine {
             /*
              * Il metodo merge setta i valori passati sull'entità ricorsivamente, inolte lancia i giusti interceptor sui figli.
              */
-            entity = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass);
+            entity = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
 
             /*
              * interceptor su entità padre (gli interceptor su entità figlie sono già state fatte prima).
@@ -336,7 +340,7 @@ public abstract class RestControllerEngine {
                 Object beforeUpdateEntity = cloneEntity(entity);
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
-                res = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass);
+                res = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
 
                 restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData, true, projectionClass);
 
@@ -386,7 +390,7 @@ public abstract class RestControllerEngine {
      * @throws InstantiationException
      * @throws NoSuchMethodException
      */
-    protected Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap, ArrayList<Object> getMethodPaths, Class projectionClass) throws Exception {
+    protected Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap, ArrayList<Object> getMethodPaths, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
 
         Class entityClass = EntityReflectionUtils.getEntityFromProxyObject(entity);
         String entityPkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
@@ -395,6 +399,10 @@ public abstract class RestControllerEngine {
         checkVersion(entity, entityClass, entityPkFieldName, data);
         
         boolean hasSerialPrimaryKey = EntityReflectionUtils.hasSerialPrimaryKey(entityClass);
+        
+        if (ancestorsFk != null && !ancestorsFk.isEmpty()) {
+            manageAncestorsMege(entity, entityClass, ancestorsFk, data);
+        }
 
         for (String key : data.keySet()) {
 
@@ -422,13 +430,13 @@ public abstract class RestControllerEngine {
                             manageArrayMerge(entity, value, setMethod);
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
 
-                            manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths), projectionClass);
+                            manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths), projectionClass, ancestorsFk);
                         } else if (EntityReflectionUtils.isForeignKeyField(field)) {
                             /*
                              * caso in cui l'elemento è un'entità singola,
                              * richiamo ricorsivamente il merge sull'oggetto.
                              */
-                            manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths) , projectionClass);
+                            manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths) , projectionClass, ancestorsFk);
                         } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageEnumMerge(entity, value, setMethod);
                         } else if (Number.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
@@ -519,7 +527,7 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NoSuchMethodException
      */
-    protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass) throws Exception {
+    protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
         // Aggiungo alla lista di metodi get il get attuale
         getMethodsPath.add(getMethod);
         Field field = EntityReflectionUtils.getDeclaredField(entityClass, key);
@@ -536,7 +544,14 @@ public abstract class RestControllerEngine {
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
         if (willBeEntityModified && !inserting)
             beforeUpdateEntity = cloneEntity(childEntity);
-        childEntity = merge(value, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass);
+        
+        
+//        if (ancestorsFk == null) {
+//            ancestorsFk = new ArrayList();
+//        }
+//        ancestorsFk.add(new ImmutablePair(entityClass, entity));
+        
+        childEntity = merge(value, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass, ancestorsFk);
         if (inserting) {
             childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
             launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
@@ -934,7 +949,7 @@ public abstract class RestControllerEngine {
      * @throws EntityReflectionException
      * @throws AbortSaveInterceptorException
      */
-    protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass) throws Exception {
+    protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
         // Aggiungo alla lista di metodi get il metodo get attuale
         getMethodsPath.add(getMethod);
         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
@@ -1031,6 +1046,18 @@ public abstract class RestControllerEngine {
                 Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
                 // setto sull'entità l'oggetto padre corretto (che è appunto l'entità padre, dalla quale ho tirato fuori la collection)
                 setParentFkMethod.invoke(childEntity, entity);
+                
+                if (ancestorsFk == null) {
+                    ancestorsFk = new ArrayList();
+                }
+                insertAncestorIfExists(childEntity.getClass(), filterFieldName, entity, ancestorsFk);
+//                for (Pair ancestorFk : ancestorsFk) {
+//                    setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), (String)ancestorFk.getLeft());
+//                    if (setParentFkMethod != null) {
+//                        setParentFkMethod.invoke(childEntity, ancestorFk.getRight());
+//                    }
+//                }
+//                ancestorsFk.add(new ImmutablePair(entity.getClass(), entity));
             }
 
             Object beforeUpdateEntity = null;
@@ -1044,7 +1071,7 @@ public abstract class RestControllerEngine {
             // Aggiungo alla lista di metodi get l'indice che l'entità su cui sto lavorando ha nella collection
             getMethodsPath.add(collIndex);
             // per ognuno chiamo ricorsivamente il merge in modo da gestire gli eventuali figli
-            childEntity = merge(childValue, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass);
+            childEntity = merge(childValue, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass, ancestorsFk);
 
             if (inserting) {
 
@@ -1386,5 +1413,50 @@ public abstract class RestControllerEngine {
         }
         return resource;
     }
-
+    
+    /**
+     * Questa funzione si occupa di riempire le FK verso entità padri (e nonni etc)
+     * Le fk da riempire e l'oggetto con cui riempirle sono scritte dentro la lista ancestorsFk
+     * @param entity
+     * @param entityClass
+     * @param ancestorsFk è una lista di Pair. Left: Classe dell'entità. Right: Entità
+     * @param data 
+     */
+    private void manageAncestorsMege(Object entity, Class entityClass, List<Pair> ancestorsFk, Map<String, Object> data) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        for (Pair ancestorFk : ancestorsFk) {
+            Field[] declaredFields = entityClass.getDeclaredFields();
+            for (Field field : declaredFields) {
+                NextSdrAncestor annotation = field.getAnnotation(NextSdrAncestor.class);
+                if (annotation != null && annotation.relationName().equals((String)ancestorFk.getLeft())) {
+                    if (!data.containsKey(field.getName())) {
+                        Method setParentFkMethod = EntityReflectionUtils.getSetMethod(entityClass, field.getName());
+                        if (setParentFkMethod != null) {
+                            setParentFkMethod.invoke(entity, ancestorFk.getRight());
+                        }
+                    }
+                }
+                //ancestorsFk: idContatto Email entitòContatto
+//                if (field.getType().equals((Class)ancestorFk.getLeft())) {
+//                    if (!data.containsKey(field.getName())) {
+//                        Method setParentFkMethod = EntityReflectionUtils.getSetMethod(entityClass, field.getName());
+//                        if (setParentFkMethod != null) {
+//                            setParentFkMethod.invoke(entity, ancestorFk.getRight());
+//                        }
+//                    }
+//                }
+            }
+        }
+    }
+    
+    private void insertAncestorIfExists(Class entityClass, String fieldName, Object entity, List<Pair> ancestorsFk) {
+        Field[] declaredFields = entityClass.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.getName().equals(fieldName)) {
+                NextSdrAncestor annotation = field.getAnnotation(NextSdrAncestor.class);
+                if (annotation != null) {
+                    ancestorsFk.add(new ImmutablePair(annotation.relationName(), entity));
+                }
+            }
+        }
+    }
 }
