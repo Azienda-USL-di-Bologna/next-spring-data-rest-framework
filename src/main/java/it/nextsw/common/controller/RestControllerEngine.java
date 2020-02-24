@@ -41,6 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import javax.persistence.EntityManager;
+import javax.persistence.OneToOne;
 import javax.persistence.OptimisticLockException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
@@ -539,6 +540,24 @@ public abstract class RestControllerEngine {
         if (childEntity == null) {
             inserting = true;
             childEntity = field.getType().newInstance();
+        }
+        
+        // Voglio settare sull'entità filia il riferimento all'entità padre (entity)
+//        Field declaredField = entityClass.getDeclaredField(key);
+        if (field != null) {
+            OneToOne oneToOne = Arrays.stream(field.getAnnotationsByType(OneToOne.class)).findFirst().orElse(null);
+            if (oneToOne != null) {
+                String filterFieldName = oneToOne.mappedBy();
+                if (filterFieldName != null && !filterFieldName.equals("")) {
+                    Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
+                    setParentFkMethod.invoke(childEntity, entity);
+                
+                    if (ancestorsFk == null) {
+                        ancestorsFk = new ArrayList();
+                    }
+                    insertAncestorIfExists(childEntity.getClass(), filterFieldName, entity, ancestorsFk);
+                }
+            }
         }
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
@@ -1436,15 +1455,6 @@ public abstract class RestControllerEngine {
                         }
                     }
                 }
-                //ancestorsFk: idContatto Email entitòContatto
-//                if (field.getType().equals((Class)ancestorFk.getLeft())) {
-//                    if (!data.containsKey(field.getName())) {
-//                        Method setParentFkMethod = EntityReflectionUtils.getSetMethod(entityClass, field.getName());
-//                        if (setParentFkMethod != null) {
-//                            setParentFkMethod.invoke(entity, ancestorFk.getRight());
-//                        }
-//                    }
-//                }
             }
         }
     }
@@ -1457,6 +1467,7 @@ public abstract class RestControllerEngine {
                 if (annotation != null) {
                     ancestorsFk.add(new ImmutablePair(annotation.relationName(), entity));
                 }
+                break;
             }
         }
     }
