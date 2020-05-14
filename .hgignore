@@ -4,3 +4,4 @@ target
 .idea
 next-spring-data-rest-framework.iml
 nbactions.xml
+nb-configuration.xml
