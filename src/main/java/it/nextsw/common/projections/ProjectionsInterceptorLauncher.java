@@ -24,7 +24,6 @@ import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.stereotype.Component;
@@ -306,6 +305,6 @@ public class ProjectionsInterceptorLauncher {
      * @return un oggetto Sort secondo le proprietà passate
      */
     public Sort buildSort(String direction, String... properties) {
-        return new Sort(Sort.Direction.fromString(direction), properties);
+        return Sort.by(Sort.Direction.fromString(direction), properties);
     }
 }

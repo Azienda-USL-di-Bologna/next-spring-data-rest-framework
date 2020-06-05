@@ -59,7 +59,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.web.PagedResourcesAssembler;
-import org.springframework.hateoas.ResourceAssembler;
+import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -84,7 +84,7 @@ public abstract class RestControllerEngine {
     protected PagedResourcesAssembler<Object> assembler;
 
     @Autowired
-    protected ResourceAssembler resourceAssembler;
+    protected RepresentationModelAssembler resourceAssembler;
 
     @Autowired
     protected ObjectMapper objectMapper;
@@ -1428,7 +1428,7 @@ public abstract class RestControllerEngine {
             // per ogni elemento della pagina gli si applica la createProjection
             Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             // assembla il risultato in HAL
-            resource = assembler.toResource(projected);
+            resource = assembler.toModel(projected);
 //            resource = assembler.toResource(entities);
         }
         return resource;
