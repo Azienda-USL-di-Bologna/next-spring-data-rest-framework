@@ -6,26 +6,27 @@
     <artifactId>next-spring-data-rest-framework</artifactId>
     <version>1.8.0.alfa</version>
     <packaging>jar</packaging>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.3.2.RELEASE</version>
+    </parent>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <java.version>1.8</java.version>
         <javadoc.opts>-Xdoclint:none</javadoc.opts>
-        <spring.boot.version>2.2.5.RELEASE</spring.boot.version>
-        <query.dsl.version>4.2.1</query.dsl.version>
     </properties>
     <dependencies>
         <dependency>
             <groupId>javax.persistence</groupId>
             <artifactId>javax.persistence-api</artifactId>
-            <version>2.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>javax.validation</groupId>
             <artifactId>validation-api</artifactId>
-            <version>2.0.1.Final</version>
         </dependency>
         <dependency>
             <groupId>org.reflections</groupId>
@@ -35,7 +36,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.9.6</version>
             <scope>provided</scope>
         </dependency>
         <!--<dependency>-->
@@ -51,20 +51,22 @@
         <!--</dependency>-->
         <dependency>
             <groupId>com.querydsl</groupId>
+            <artifactId>querydsl-apt</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.querydsl</groupId>
             <artifactId>querydsl-jpa</artifactId>
-            <version>${query.dsl.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-rest</artifactId>
-            <version>${spring.boot.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
-            <version>${spring.boot.version}</version>
             <scope>provided</scope>
         </dependency>
 <!--        <dependency>
@@ -81,7 +83,6 @@
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.1</version>
             <scope>provided</scope>
         </dependency>
         <!--<dependency>-->
@@ -101,41 +102,31 @@
             <!--<version>5.3.3.Final</version>-->
         <!--</dependency>-->
 
-        <dependency>
-            <groupId>com.querydsl</groupId>
-            <artifactId>querydsl-apt</artifactId>
-            <version>${query.dsl.version}</version>
-            <scope>provided</scope>
-        </dependency>
+        
         <!-- TEST  -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
-            <version>${spring.boot.version}</version>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>test</scope>
-            <version>1.4.193</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.6</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.9</version>
         </dependency>
 
 

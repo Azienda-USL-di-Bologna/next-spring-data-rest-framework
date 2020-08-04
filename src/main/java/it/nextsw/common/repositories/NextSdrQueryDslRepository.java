@@ -4,7 +4,9 @@ import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.EntityPath;
 import com.querydsl.core.types.Path;
 import com.querydsl.core.types.Predicate;
+import com.querydsl.core.types.dsl.ArrayPath;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.BooleanTemplate;
 import com.querydsl.core.types.dsl.DatePath;
 import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
@@ -25,6 +27,8 @@ import javax.persistence.Column;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.querydsl.binding.QuerydslBinderCustomizer;
 import org.springframework.data.querydsl.binding.QuerydslBindings;
+import org.springframework.lang.Nullable;
+import org.springframework.util.StringUtils;
 
 /**
  * QuerydslBinderCustomizer: customizza i filtri
@@ -48,6 +52,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
      * @param entityPath
      */
     @Override
+    @Nullable
     default void customize(QuerydslBindings bindings, T entityPath) {
 
         bindings.bind(LocalDate.class).all(
@@ -105,7 +110,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         });
 
         bindings.bind(String.class).all(
-                (StringPath path, Collection<? extends String> values) -> {
+                (Path<String> path, Collection<? extends String> values) -> {
                     final List<? extends Object> strings = new ArrayList<>(values);
                     Predicate res;
                     try {
@@ -126,7 +131,27 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         path
                                 ); 
                                 res = booleanTemplate;
-                            } 
+                            } else if (columDefinition != null && columDefinition.equalsIgnoreCase("text[]")) {
+                                BooleanBuilder b = new BooleanBuilder();
+                                BooleanExpression expression;
+                                for (Object valueObj : values) {
+                                    Object[] value = (Object[]) valueObj;
+                                    if (!StringUtils.hasText((String) value[0])) {
+                                        ArrayPath arrayPath = (ArrayPath) path;
+                                        BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
+                                                "cardinality({0})=0", arrayPath
+                                        );
+                                        expression = arrayPath.isNull().or(arrayIsEmpty);
+                                    } else {
+                                        expression = Expressions.booleanTemplate(
+                                            String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
+                                            path
+                                        );
+                                    }
+                                    b = b.or(expression);
+                                }
+                                res = b;
+                            }
 //                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
 //                                if (strings.size() == 1) {
 //                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
@@ -147,23 +172,24 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
 //                                }
 //                            } 
                             else {
+                                StringPath stringPath = (StringPath) path;
                                 if (values.size() == 1) {
                                     String string;
                                     if (strings.get(0).getClass().isEnum()) {
                                         string = ((Enum) strings.get(0)).toString();
-                                        res = path.eq(string);
+                                        res = stringPath.eq(string);
                                     } else {
                                         string = (String) strings.get(0);
-                                        res = getStringPredicate(string, path);
+                                        res = getStringPredicate(string, stringPath);
                                     }
                                 } else {
                                     BooleanBuilder b = new BooleanBuilder();
                                     for (Object value : values) {
                                         if (value.getClass().isEnum()) {
                                             String string = ((Enum) value).toString();
-                                            b = b.or( path.eq(string));
+                                            b = b.or( stringPath.eq(string));
                                         } else {
-                                            b = b.or(getStringPredicate((String) value, path));
+                                            b = b.or(getStringPredicate((String) value, stringPath));
                                         }
                                     }
                                     res = b;
@@ -180,27 +206,49 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         bindings.bind(Integer.class).all(
                 (Path<Integer> path, Collection<? extends Integer> values) -> {
                     final List<? extends Integer> numbers = new ArrayList<>(values);
-                    Predicate res = null;
-                    if (values.isEmpty()) {
-                        res = Expressions.asBoolean(true).isTrue();
-                    } else if (values.size() == 1) {
-                        // stratagemma per riuscire a filtrare per null.
-                        // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null
-                        if (numbers.get(0) == 999999999) {
-                            NumberPath integerPath = (NumberPath) path;
-                            res = integerPath.isNull();
-                        } else {
-                            NumberPath integerPath = (NumberPath) path;
-                            res = integerPath.eq(numbers.get(0));
-                        }
-                    } else {
+                    Predicate res;
+                    String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                    if (columDefinition != null && columDefinition.equalsIgnoreCase("integer[]")) {
                         BooleanBuilder b = new BooleanBuilder();
-                        for (Integer value : values) {
-                            NumberPath integerPath = (NumberPath) path;
-                            b = b.or(integerPath.eq(value));
+                        BooleanExpression expression;
+                        for (Object valueObj : values) {
+                            Object[] value = (Object[]) valueObj;
+                            if (value[0] == null) {
+                                ArrayPath arrayPath = (ArrayPath) path;
+                                BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
+                                        "cardinality({0})=0", arrayPath
+                                );
+                                expression = arrayPath.isNull().or(arrayIsEmpty);
+                            } else {
+                                expression = Expressions.booleanTemplate(
+                                    String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
+                                    path
+                                );
+                            }
+                            b = b.or(expression);
                         }
                         res = b;
+                    } else {
+                        NumberPath integerPath = (NumberPath) path;
+                        if (values.isEmpty()) {
+                            res = Expressions.asBoolean(true).isTrue();
+                        } else if (values.size() == 1) {
+                            // stratagemma per riuscire a filtrare per null.
+                            // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null
+                            if (numbers.get(0) == 999999999) {
+                                res = integerPath.isNull();
+                            } else {
+                                res = integerPath.eq(numbers.get(0));
+                            }
+                        } else {
+                            BooleanBuilder b = new BooleanBuilder();
+                            for (Integer value : values) {
+                                b = b.or(integerPath.eq(value));
+                            }
+                            res = b;
+                        }
                     }
+                    
                     return Optional.of(res);
                 });
 
