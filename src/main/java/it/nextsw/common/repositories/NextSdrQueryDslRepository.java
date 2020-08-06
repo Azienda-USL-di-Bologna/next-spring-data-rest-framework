@@ -42,6 +42,8 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         extends QuerydslBinderCustomizer<T>,
         QuerydslPredicateExecutor<E> {
 
+    public String ciaoCiao();
+    
     /**
      * per generare il Q per fare i filtri, si istanzia un oggetto del campo di
      * ricerca. Implemetando il metodo customize ci si gestisce i filtri come si

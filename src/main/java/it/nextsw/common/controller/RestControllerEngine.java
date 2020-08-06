@@ -1363,6 +1363,7 @@ public abstract class RestControllerEngine {
          * Spring ha una mappa dove la chiave ha il nome della classe in lowerCamelcase mentre il valore corrisponde al valore dei repository
          */
         NextSdrQueryDslRepository generalRepository = getGeneralRepository(request, id != null);
+
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, generalRepository);
