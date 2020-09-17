@@ -1411,6 +1411,7 @@ public abstract class RestControllerEngine {
              * caso in cui non è stato passato un id specifico da ricercare,
              * quindi lo devo fare su tutti i record di una classe
              */
+//            Page entities = generalRepository.findAllNoCount(predicate, pageable);
             Page entities = generalRepository.findAll(predicate, pageable);
             try {
                 // applicare after select multiplo

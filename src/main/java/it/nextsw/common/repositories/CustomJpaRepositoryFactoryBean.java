@@ -18,6 +18,6 @@ public class CustomJpaRepositoryFactoryBean<T extends Repository<S, I>, S, I> ex
 
     @Override
     protected RepositoryFactorySupport createRepositoryFactory(EntityManager entityManager) {
-        return new CustomJpaRepositoryFactory(entityManager);
+        return new CustomRepositoryFactory(entityManager);
     }
 }

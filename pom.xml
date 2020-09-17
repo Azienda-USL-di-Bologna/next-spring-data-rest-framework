@@ -148,6 +148,7 @@
                     <!-- or whatever version you use -->
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <debug>true</debug>
                 </configuration>
             </plugin>
             <plugin>

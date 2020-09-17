@@ -24,6 +24,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.persistence.Column;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.querydsl.binding.QuerydslBinderCustomizer;
 import org.springframework.data.querydsl.binding.QuerydslBindings;
@@ -42,7 +44,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         extends QuerydslBinderCustomizer<T>,
         QuerydslPredicateExecutor<E> {
 
-    public String ciaoCiao();
+   public Page<T> findAllNoCount(Predicate predicate, Pageable pageable);
     
     /**
      * per generare il Q per fare i filtri, si istanzia un oggetto del campo di
