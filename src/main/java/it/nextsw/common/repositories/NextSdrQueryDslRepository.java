@@ -127,7 +127,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
                             if (columDefinition != null && columDefinition.contains("tsvector")) {
                                 BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", String.join(" ", (List<String>)strings)), 
+                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", String.join(" ", (List<String>)strings).replace("'", "''")), 
                                         path
                                 ); 
                                 res = booleanTemplate;
