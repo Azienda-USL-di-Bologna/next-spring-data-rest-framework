@@ -442,6 +442,12 @@ public abstract class RestControllerEngine {
                             manageEnumMerge(entity, value, setMethod);
                         } else if (Number.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageNumericMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
+                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb") || 
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json")
+                                )
+                        ) {
+                            manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else {
                             /*
                              * tutti gli altri casi, cioè l'elemento è un tipo
@@ -868,7 +874,25 @@ public abstract class RestControllerEngine {
         setMethod.invoke(entity, value);
     }
 
-
+    /**
+     * Gestisce la merge del caso in cui la colonna è di tipo json, 
+     * essenzialmente chiama l'invoke sul set per settare il value 
+     * convertendolo al tipo corretto tramite l'objectMapper
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param value
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageJsonMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        setMethod.invoke(entity, objectMapper.convertValue(value, setMethod.getParameterTypes()[0]));
+    }
+    
     /**
      * gestione delle enum durante il merge
      *
