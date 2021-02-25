@@ -7,11 +7,6 @@ import it.nextsw.common.persistence.entities.QAgente;
 import it.nextsw.common.persistence.repository.AgenteRestRepository;
 import it.nextsw.common.rest.CrudController;
 import it.nextsw.common.rest.QueringRepositorySpringController;
-import org.junit.Before;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
@@ -33,15 +28,18 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 
 
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.shadow.com.univocity.parsers.annotations.FixedWidth;
 
-@RunWith(SpringRunner.class)
+//@RunWith(SpringRunner.class)
 @SpringBootApplication(scanBasePackages = {"it.nextsw"})
 @EntityScan("it.nextsw.common.persistence.entities")
 @EnableJpaRepositories(basePackages = {"it.nextsw.common.persistence.repository"})
 @TestPropertySource(
         locations = "classpath:application-integrationtest.properties")
 @ContextConfiguration(loader = AnnotationConfigContextLoader.class, classes = SpringConfig.class)
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+//@FixedWidthMethodOrder(MethodSorters.NAME_ASCENDING)
 public class AgenteTest {
 
 
@@ -59,7 +57,7 @@ public class AgenteTest {
     protected ObjectMapper objectMapper;
 
 
-    @Before
+    @BeforeAll
     public void setup () {
         createEntityService.createDBEnviromentIfNotExist();
 //        DefaultMockMvcBuilder builder = MockMvcBuilders.webAppContextSetup(applicationContext.);
