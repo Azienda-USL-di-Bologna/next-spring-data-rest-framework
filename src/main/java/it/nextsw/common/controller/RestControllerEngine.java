@@ -257,6 +257,11 @@ public abstract class RestControllerEngine {
         }
     }
 
+    
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+        delete(id, request, additionalData, entityPath, batch, projection, null);
+    }
+    
     /**
      * Cancellazione di un'entities
      *
@@ -265,14 +270,18 @@ public abstract class RestControllerEngine {
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
+     * @param projection  
+     * @param repository     se si conosce il repository lo si può passare direttamente
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection, JpaRepository repository) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         launchedBeforeInterceptors = new ArrayList<ParameterizedInterceptor>();
         JpaRepository generalRepository;
-        if (StringUtils.hasText(entityPath)) {
+        if (repository != null) {
+            generalRepository = repository;
+        } else if (StringUtils.hasText(entityPath)) {
             generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
         } else {
             generalRepository = (JpaRepository) getGeneralRepository(request, true);
