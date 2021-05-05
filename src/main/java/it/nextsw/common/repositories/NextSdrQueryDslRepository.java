@@ -107,7 +107,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     }
                     return Optional.of(res);
                 });
-        
+
         bindings.bind(Enum.class).first((path, value) -> {
             System.out.println("dentro");
             return null; //To change body of generated lambdas, choose Tools | Templates.
@@ -127,13 +127,20 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                              *  che viene registrata creando in CustomDialect per hibernate (classe it.nextsw.common.dialect.CustomPostgresDialect).
                              * Per il corretto funzionamento è necessatio abilitare il CustomDialect aggiungendo la seguente riga nell'application.properties del progetto:
                              *  "spring.jpa.properties.hibernate.dialect=it.nextsw.common.dialect.CustomPostgresDialect"
-                            */
+                             */
                             String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
                             if (columDefinition != null && columDefinition.contains("tsvector")) {
                                 BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", String.join(" ", (List<String>)strings)), 
+                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
                                         path
-                                ); 
+                                );
+                                if (values.size() > 1) {
+                                    for (int i = 1; i < strings.size(); i++) {
+                                        booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
+                                                String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")),
+                                                path)));
+                                    }
+                                }
                                 res = booleanTemplate;
                             } else if (columDefinition != null && columDefinition.equalsIgnoreCase("text[]")) {
                                 BooleanBuilder b = new BooleanBuilder();
@@ -148,33 +155,32 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         expression = arrayPath.isNull().or(arrayIsEmpty);
                                     } else {
                                         expression = Expressions.booleanTemplate(
-                                            String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
-                                            path
+                                                String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
+                                                path
                                         );
                                     }
                                     b = b.or(expression);
                                 }
                                 res = b;
-                            }
-//                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
-//                                if (strings.size() == 1) {
-//                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-//                                        String.format("FUNCTION('jsonb_match', {0}, '%s')= true", strings.get(0)), 
-//                                        path
-//                                    ); 
-//                                res = booleanTemplate;
-//                                } else {
-//                                    BooleanBuilder b = new BooleanBuilder();
-//                                    for (Object value: strings) {
-//                                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-//                                            String.format("FUNCTION('jsonb_match', {0}, '%s')= true", value,
-//                                            path
-//                                            ));
-//                                        b = b.or(booleanTemplate);
-//                                    }
-//                                    res = b;
-//                                }
-//                            } 
+                            } //                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
+                            //                                if (strings.size() == 1) {
+                            //                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                            //                                        String.format("FUNCTION('jsonb_match', {0}, '%s')= true", strings.get(0)), 
+                            //                                        path
+                            //                                    ); 
+                            //                                res = booleanTemplate;
+                            //                                } else {
+                            //                                    BooleanBuilder b = new BooleanBuilder();
+                            //                                    for (Object value: strings) {
+                            //                                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                            //                                            String.format("FUNCTION('jsonb_match', {0}, '%s')= true", value,
+                            //                                            path
+                            //                                            ));
+                            //                                        b = b.or(booleanTemplate);
+                            //                                    }
+                            //                                    res = b;
+                            //                                }
+                            //                            } 
                             else {
                                 StringPath stringPath = (StringPath) path;
                                 if (values.size() == 1) {
@@ -191,7 +197,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                     for (Object value : values) {
                                         if (value.getClass().isEnum()) {
                                             String string = ((Enum) value).toString();
-                                            b = b.or( stringPath.eq(string));
+                                            b = b.or(stringPath.eq(string));
                                         } else {
                                             b = b.or(getStringPredicate((String) value, stringPath));
                                         }
@@ -201,7 +207,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             }
                         }
                         return Optional.of(res);
-                        
+
                     } catch (InvalidFilterException ex) {
                         return Optional.of(Expressions.asBoolean(true).isTrue());
                     }
@@ -225,8 +231,8 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                 expression = arrayPath.isNull().or(arrayIsEmpty);
                             } else {
                                 expression = Expressions.booleanTemplate(
-                                    String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
-                                    path
+                                        String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
+                                        path
                                 );
                             }
                             b = b.or(expression);
@@ -252,7 +258,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             res = b;
                         }
                     }
-                    
+
                     return Optional.of(res);
                 });
 
