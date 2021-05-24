@@ -40,6 +40,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.logging.Level;
 import javax.persistence.EntityManager;
 import javax.persistence.OneToOne;
 import javax.persistence.OptimisticLockException;
@@ -277,7 +278,7 @@ public abstract class RestControllerEngine {
      * @throws NotFoundResourceException
      */
     public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection, JpaRepository repository) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
-        launchedBeforeInterceptors = new ArrayList<ParameterizedInterceptor>();
+        launchedBeforeInterceptors = new ArrayList();
         JpaRepository generalRepository;
         if (repository != null) {
             generalRepository = repository;
@@ -302,7 +303,13 @@ public abstract class RestControllerEngine {
 
             // Lancio gli interceptor after anche sulle entità correlate
             restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
-        } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+        } catch (ClassNotFoundException | 
+                EntityReflectionException | 
+                IllegalAccessException | 
+                IllegalArgumentException | 
+                InvocationTargetException | 
+                NoSuchMethodException
+                ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         } catch (SkipDeleteInterceptorException ex) {
             LOGGER.info("eliminazione annullata dall'interceptor", ex);

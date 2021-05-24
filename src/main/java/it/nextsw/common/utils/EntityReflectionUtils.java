@@ -12,6 +12,7 @@ import javax.persistence.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -51,6 +52,11 @@ public class EntityReflectionUtils {
 
     public static Field getPrimaryKeyField(Class entityClass) {
         return getFieldFromAnnotation(entityClass, Id.class);
+    }
+    
+    public static Object getPrimaryKeyValue(Object entity) throws NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        Method primaryKeyGetMethod = getPrimaryKeyGetMethod(entity);
+        return primaryKeyGetMethod.invoke(entity);
     }
     
     public static Field getVersionField(Class entityClass) {

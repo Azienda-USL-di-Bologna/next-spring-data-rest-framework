@@ -175,15 +175,23 @@ public class RestControllerInterceptorEngine {
         return interceptors != null && interceptors.stream().anyMatch((interceptor) -> (Arrays.stream(interceptor.getClass().getDeclaredMethods()).anyMatch(method -> method.getName().equals(NextSdrControllerInterceptor.BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME))));
     }
 
-    /** Lancia gli interceptor di tipo after per tutte le entità figlie in base a quanto indicato nella lista passata.
-     * L'idea è che quando il RestControllerEngine utilizza le sue procedure per fare i vari aggiornamenti, ogni volta che
-     * tenta di lanciare un interceptor di before su una entità secondaria (discendente di quella principale su cui è stata
-     * richiesta l'operazione) salva in una lista questo tentativo; alla fine dell'operazione per tutti gli interceptor di before
-     * che si è cercato di lanciare, si fa l'equivalente per cercare di lanciare i corrispettivi interceptor di tipo after.
+    /** *  Lancia gli interceptor di tipo after per tutte le entità figlie in base a quanto indicato nella lista passata.L'idea è che quando il RestControllerEngine utilizza le sue procedure per fare i vari aggiornamenti, ogni volta che
+ tenta di lanciare un interceptor di before su una entità secondaria (discendente di quella principale su cui è stata
+ richiesta l'operazione) salva in una lista questo tentativo; alla fine dell'operazione per tutti gli interceptor di before
+ che si è cercato di lanciare, si fa l'equivalente per cercare di lanciare i corrispettivi interceptor di tipo after.
      *
+     * @param mainEntity
      * @param launchedBeforeInterceptors lista che contiene tutti gli interceptor di tipo before che si è cercato di lanciare
+     * @throws it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException
+     * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
+     * @throws java.lang.ClassNotFoundException
+     * @throws java.lang.reflect.InvocationTargetException
+     * @throws it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException
+     * @throws it.nextsw.common.controller.exceptions.RestControllerEngineException
+     * @throws java.lang.IllegalAccessException
+     * @throws java.lang.NoSuchMethodException
      */
-    public void launchAfterInterceptorsOnChildEntities(Object mainEntity, List<ParameterizedInterceptor> launchedBeforeInterceptors) throws AbortSaveInterceptorException, EntityReflectionException, ClassNotFoundException, InvocationTargetException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException {
+    public void launchAfterInterceptorsOnChildEntities(Object mainEntity, List<ParameterizedInterceptor> launchedBeforeInterceptors) throws AbortSaveInterceptorException, EntityReflectionException, ClassNotFoundException, InvocationTargetException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, NoSuchMethodException {
         for (ParameterizedInterceptor launchedInterceptor : launchedBeforeInterceptors){
             InterceptorParameters params = launchedInterceptor.getParameters();
             switch (launchedInterceptor.getOperation()){
@@ -249,6 +257,10 @@ public class RestControllerInterceptorEngine {
      * @param entity
      * @param request
      * @param additionalData
+     * @param alreadyChecked
+     * @param interceptorType
+     * @param mainEntity
+     * @param projectionClass
      * @throws ClassNotFoundException
      * @throws AbortSaveInterceptorException
      * @throws EntityReflectionException
@@ -257,13 +269,16 @@ public class RestControllerInterceptorEngine {
      * @throws IllegalAccessException
      * @throws IllegalArgumentException
      * @throws InvocationTargetException
+     * @throws java.lang.NoSuchMethodException
      */
     public void launchNestedDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, Map<String, Boolean> alreadyChecked,
-                                               NextSdrControllerInterceptor.InterceptorType interceptorType, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+                                               NextSdrControllerInterceptor.InterceptorType interceptorType, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException {
         if (alreadyChecked == null) {
             alreadyChecked = new HashMap();
         }
-        alreadyChecked.put(EntityReflectionUtils.getEntityFromProxyObject(entity).getCanonicalName(), true);
+        Object primaryKeyValue = EntityReflectionUtils.getPrimaryKeyValue(entity);
+        String alreadyCheckedKey = EntityReflectionUtils.getEntityFromProxyObject(entity).getCanonicalName() + "_" + primaryKeyValue.toString();
+        alreadyChecked.put(alreadyCheckedKey, true);
         Field[] fields = entity.getClass().getDeclaredFields();
         if (fields != null && fields.length > 0) {
             for (Field field : fields) {
@@ -272,12 +287,16 @@ public class RestControllerInterceptorEngine {
                 if (EntityReflectionUtils.isForeignKeyField(field) && Collection.class.isAssignableFrom(field.getType())) {
                     Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), field.getName());
                     Collection childEntityCollection = (Collection) getMethod.invoke(entity);
-                    String entityToCheck = ((ParameterizedType) getMethod.getAnnotatedReturnType().getType()).getActualTypeArguments()[0].getTypeName();
-                    if (!alreadyChecked.containsKey(entityToCheck) || !alreadyChecked.get(entityToCheck)) {
-                        for (Object childEntity : childEntityCollection) {
+//                    String entityToCheck = ((ParameterizedType) getMethod.getAnnotatedReturnType().getType()).getActualTypeArguments()[0].getTypeName();
+//                    if (!alreadyChecked.containsKey(entityToCheck) || !alreadyChecked.get(entityToCheck)) {
+                    for (Object childEntity : childEntityCollection) {
+                        Object childEntityPrimaryKeyValue = EntityReflectionUtils.getPrimaryKeyValue(childEntity);
+                        String alreadyCheckedKeyToCheck = EntityReflectionUtils.getEntityFromProxyObject(childEntity).getCanonicalName() + "_" + childEntityPrimaryKeyValue.toString();
+                        if (!alreadyChecked.containsKey(alreadyCheckedKeyToCheck) || !alreadyChecked.get(alreadyCheckedKeyToCheck)) {
                             launchNestedDeleteInterceptor(childEntity, request, additionalData, alreadyChecked, interceptorType, false, projectionClass);
                         }
                     }
+//                    }
                 }
             }
         }
