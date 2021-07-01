@@ -17,8 +17,8 @@ public class HibernateEntityInterceptor extends EmptyInterceptor {
     @Override
     public String onPrepareStatement(String sql) {
         
-        System.out.println("ciao gdm non ti arrabbiare");
-        System.out.println("sql: " + sql);
+//        System.out.println("ciao gdm non ti arrabbiare");
+//        System.out.println("sql: " + sql);
         
         Map<String, String> rankQueryMap = rankQueryObj.get();
         final String regex = "\\{[a-zA-Z]+\\.PLACEHOLDER_TS_RANK\\}";
@@ -35,7 +35,7 @@ public class HibernateEntityInterceptor extends EmptyInterceptor {
             
             // Se sono rimasti dei placeholder li "cancello"
             sql = sql.replaceAll(regex, "");
-            System.out.println("sql cambiato!: " + sql);
+//            System.out.println("sql cambiato!: " + sql);
         }
             
         return super.onPrepareStatement(sql); //To change body of generated methods, choose Tools | Templates.
