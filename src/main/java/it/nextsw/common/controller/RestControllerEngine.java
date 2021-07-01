@@ -40,7 +40,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.logging.Level;
 import javax.persistence.EntityManager;
 import javax.persistence.OneToOne;
 import javax.persistence.OptimisticLockException;
@@ -1385,7 +1384,7 @@ public abstract class RestControllerEngine {
     @Transactional(readOnly = true)
     public Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
-        Class projectionClass;
+        Class projectionClass;   
         /*
          * trasforma gli additionalData espressi in stringa in una mappa vera
          * attraverso un metodo di Google
@@ -1471,6 +1470,10 @@ public abstract class RestControllerEngine {
             resource = assembler.toModel(projected);
 //            resource = assembler.toResource(entities);
         }
+        
+        // Svuoto il threadLocal
+        HibernateEntityInterceptor.rankQueryObj.remove();
+        
         return resource;
     }
     

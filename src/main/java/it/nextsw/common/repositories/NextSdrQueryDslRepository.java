@@ -12,14 +12,19 @@ import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
+import it.nextsw.common.controller.HibernateEntityInterceptor;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -130,13 +135,27 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
                                         path
                                 );
+                                Map<String, String> rankQueryMap = HibernateEntityInterceptor.rankQueryObj.get();
+                                if (rankQueryMap == null) {
+                                    rankQueryMap = new HashMap();
+                                    HibernateEntityInterceptor.rankQueryObj.set(rankQueryMap);
+                                }
+                                AnnotatedElement annotatedElement = path.getAnnotatedElement();
+                                String buildingRankQuery = (String) strings.get(0);
+
                                 if (values.size() > 1) {
                                     for (int i = 1; i < strings.size(); i++) {
                                         booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
                                                 String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")),
                                                 path)));
+                                        buildingRankQuery = buildingRankQuery + " " + ((String) strings.get(i));
                                     }
                                 }
+                                
+                                if (Field.class.isAssignableFrom(annotatedElement.getClass())) {
+                                    rankQueryMap.put(((Field)annotatedElement).getName(), buildingRankQuery);
+                                }
+                                
                                 res = booleanTemplate;
                             } else if (columDefinition != null && columDefinition.equalsIgnoreCase("text[]")) {
                                 BooleanBuilder b = new BooleanBuilder();
