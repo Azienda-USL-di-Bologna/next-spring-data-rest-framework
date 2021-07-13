@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -104,6 +105,36 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                         DateTimePath dateTimePath = (DateTimePath) path;
                         LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
                         LocalDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).plusDays(1);
+                        res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                    } else {
+                        res = Expressions.asBoolean(true).isTrue();
+                    }
+                    return Optional.of(res);
+                });
+        
+        bindings.bind(ZonedDateTime.class).all(
+                (
+                        final Path<ZonedDateTime> path,
+                        final Collection<? extends ZonedDateTime> values) -> {
+                    final List<? extends ZonedDateTime> dates = new ArrayList<>(values);
+                    Predicate res;
+                    if (values.size() == 1) {
+                        DateTimePath dateTimePath = (DateTimePath) path;
+                        if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
+                            res = dateTimePath.isNull();
+                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
+                            res = dateTimePath.isNotNull();
+                        } else {
+                            dateTimePath = (DateTimePath) path;
+                            ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
+                            ZonedDateTime endDate = startDate.plusDays(1);
+                            res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                        }
+                    } else if (dates.size() == 2) {
+                        Collections.sort(dates);
+                        DateTimePath dateTimePath = (DateTimePath) path;
+                        ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
+                        ZonedDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone()).plusDays(1);
                         res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
                     } else {
                         res = Expressions.asBoolean(true).isTrue();
