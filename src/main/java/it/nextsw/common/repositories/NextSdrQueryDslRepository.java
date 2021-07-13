@@ -1,5 +1,6 @@
 package it.nextsw.common.repositories;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.EntityPath;
 import com.querydsl.core.types.Path;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -277,6 +279,40 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     return Optional.of(res);
                 });
 
+        bindings.bind(JsonNode.class).all(
+                (Path<JsonNode> path, Collection<? extends JsonNode> values) -> {
+                    final List<? extends Object> strings = new ArrayList<>(values);
+                    Predicate res;
+                    try {
+                        if (values.isEmpty()) {
+                            res = Expressions.asBoolean(true).isTrue();
+                        } else {
+                            String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                            if (columDefinition != null && columDefinition.contains("jsonb")) {
+                                BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                                    String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", (String) strings.get(0)),
+                                    path
+                                );
+                                
+                                if (values.size() > 1) {
+                                    for (int i = 1; i < strings.size(); i++) {
+                                        booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
+                                                String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", ((String) strings.get(i))),
+                                                path)));
+                                    }
+                                }
+                                
+                                res = booleanTemplate;
+                            }  else {
+                                res = Expressions.asBoolean(true).isTrue();;
+                            }
+                        }
+                        return Optional.of(res);
+
+                    } catch (Exception ex) {
+                        return Optional.of(Expressions.asBoolean(true).isTrue());
+                    }
+                });
     }
 
     default StringOperation getStringOperation(String valueToParse) throws InvalidFilterException {

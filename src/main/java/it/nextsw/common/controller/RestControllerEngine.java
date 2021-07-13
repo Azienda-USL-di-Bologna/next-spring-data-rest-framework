@@ -58,6 +58,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
+import org.springframework.data.querydsl.binding.QuerydslBindings;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.transaction.annotation.Transactional;
@@ -444,8 +445,14 @@ public abstract class RestControllerEngine {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
+                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb") || 
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json")
+                                )
+                        ) {
+                            manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
-
+                            // TODO: QUesto else if deve assicurarsi di escludere i field json/jsonb. Per il momento è stato messo l'esleif del jsonb sopra a questo.
                             manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths), projectionClass, ancestorsFk);
                         } else if (EntityReflectionUtils.isForeignKeyField(field)) {
                             /*
@@ -457,13 +464,7 @@ public abstract class RestControllerEngine {
                             manageEnumMerge(entity, value, setMethod);
                         } else if (Number.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageNumericMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
-                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (
-                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb") || 
-                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json")
-                                )
-                        ) {
-                            manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
-                        } else {
+                        }  else {
                             /*
                              * tutti gli altri casi, cioè l'elemento è un tipo
                              * base (String o Integer, o forse qualche altro
