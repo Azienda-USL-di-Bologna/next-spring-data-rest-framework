@@ -38,7 +38,7 @@ public class PostgreSQLJsonbFunction implements SQLFunction {
         //String jsonPathField = (String) arguments.get(1);
         String value = (String) arguments.get(1);
         String jsonbContains = field + " @> " + value + "::jsonb";
-        System.out.println("jsonbContains " + jsonbContains);
+//        System.out.println("jsonbContains " + jsonbContains);
         return jsonbContains;
     }
 }

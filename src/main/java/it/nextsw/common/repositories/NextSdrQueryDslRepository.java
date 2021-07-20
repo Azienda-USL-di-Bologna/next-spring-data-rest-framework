@@ -7,6 +7,7 @@ import com.querydsl.core.types.Path;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.ArrayPath;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.BooleanPath;
 import com.querydsl.core.types.dsl.BooleanTemplate;
 import com.querydsl.core.types.dsl.DatePath;
 import com.querydsl.core.types.dsl.DateTimePath;
@@ -14,6 +15,7 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
 import it.nextsw.common.controller.HibernateEntityInterceptor;
+import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
@@ -25,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,12 +63,116 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
     @Override
     @Nullable
     default void customize(QuerydslBindings bindings, T entityPath) {
+        
+        NextSdrControllerInterceptor.filterDescriptor.remove(); // Mi assicuro di reinizializzare la varibaile threadlocal
+        Map<Path<?>, List<Object>> filterDescriptorMapaz = NextSdrControllerInterceptor.filterDescriptor.get();
+        if (filterDescriptorMapaz == null) {
+            filterDescriptorMapaz = new HashMap();
+            NextSdrControllerInterceptor.filterDescriptor.set(filterDescriptorMapaz);
+        }
+        
+        bindings.bind(Boolean.class).all((final Path<Boolean> path, final Collection<? extends Boolean> values) -> {
+            
+            Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+            filterDescriptorMap.put(path, new ArrayList(values));
+ 
+            final List<? extends Boolean> booleans = new ArrayList<>(values);
+            Predicate res;
+            
+            BooleanPath booleanPath = (BooleanPath) path;
+            
+            if (values.isEmpty()) {
+                res = Expressions.asBoolean(true).isTrue();
+            } else if (values.size() == 1) {
+                res = booleanPath.eq(booleans.get(0));
+            } else {
+                BooleanBuilder b = new BooleanBuilder();
+                for (Boolean value : values) {
+                    b = b.or(booleanPath.eq(value));
+                }
+                res = b;
+            }
+            return Optional.of(res);
+        });
+        
+        bindings.bind(Long.class).all((final Path<Long> path, final Collection<? extends Long> values) -> {
+            Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+            filterDescriptorMap.put(path, new ArrayList(values));
+ 
+            final List<? extends Long> numbers = new ArrayList<>(values);
+            Predicate res;
+            
+            NumberPath longPath = (NumberPath) path;
+            
+            if (values.isEmpty()) {
+                res = Expressions.asBoolean(true).isTrue();
+            } else if (values.size() == 1) {
+                res = longPath.eq(numbers.get(0));
+            } else {
+                BooleanBuilder b = new BooleanBuilder();
+                for (Long value : values) {
+                    b = b.or(longPath.eq(value));
+                }
+                res = b;
+            }
+            return Optional.of(res);
+        });
+        
+        bindings.bind(Double.class).all((final Path<Double> path, final Collection<? extends Double> values) -> {
+            Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+            filterDescriptorMap.put(path, new ArrayList(values));
+ 
+            final List<? extends Double> numbers = new ArrayList<>(values);
+            Predicate res;
+            
+            NumberPath doublePath = (NumberPath) path;
+            
+            if (values.isEmpty()) {
+                res = Expressions.asBoolean(true).isTrue();
+            } else if (values.size() == 1) {
+                res = doublePath.eq(numbers.get(0));
+            } else {
+                BooleanBuilder b = new BooleanBuilder();
+                for (Double value : values) {
+                    b = b.or(doublePath.eq(value));
+                }
+                res = b;
+            }
+            return Optional.of(res);
+        });
+        
+        bindings.bind(Float.class).all((final Path<Float> path, final Collection<? extends Float> values) -> {
+            Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+            filterDescriptorMap.put(path, new ArrayList(values));
+ 
+            final List<? extends Float> numbers = new ArrayList<>(values);
+            Predicate res;
+            
+            NumberPath floatPath = (NumberPath) path;
+            
+            if (values.isEmpty()) {
+                res = Expressions.asBoolean(true).isTrue();
+            } else if (values.size() == 1) {
+                res = floatPath.eq(numbers.get(0));
+            } else {
+                BooleanBuilder b = new BooleanBuilder();
+                for (Float value : values) {
+                    b = b.or(floatPath.eq(value));
+                }
+                res = b;
+            }
+            return Optional.of(res);
+        });
 
         bindings.bind(LocalDate.class).all(
                 (
                         final Path<LocalDate> path,
                         final Collection<? extends LocalDate> values) -> {
                     final List<? extends LocalDate> dates = new ArrayList<>(values);
+                                       
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                            
                     Predicate res;
                     if (values.size() == 1) {
                         DatePath datePath = (DatePath) path;
@@ -87,6 +192,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                         final Path<LocalDateTime> path,
                         final Collection<? extends LocalDateTime> values) -> {
                     final List<? extends LocalDateTime> dates = new ArrayList<>(values);
+                    
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                    
                     Predicate res;
                     if (values.size() == 1) {
                         DateTimePath dateTimePath = (DateTimePath) path;
@@ -117,6 +226,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                         final Path<ZonedDateTime> path,
                         final Collection<? extends ZonedDateTime> values) -> {
                     final List<? extends ZonedDateTime> dates = new ArrayList<>(values);
+                    
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                    
                     Predicate res;
                     if (values.size() == 1) {
                         DateTimePath dateTimePath = (DateTimePath) path;
@@ -150,6 +263,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         bindings.bind(String.class).all(
                 (Path<String> path, Collection<? extends String> values) -> {
                     final List<? extends Object> strings = new ArrayList<>(values);
+                    
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                    
                     Predicate res;
                     try {
                         if (values.isEmpty()) {
@@ -264,6 +381,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         bindings.bind(Integer.class).all(
                 (Path<Integer> path, Collection<? extends Integer> values) -> {
                     final List<? extends Integer> numbers = new ArrayList<>(values);
+                    
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                    
                     Predicate res;
                     String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
                     if (columDefinition != null && columDefinition.equalsIgnoreCase("integer[]")) {
@@ -313,6 +434,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         bindings.bind(JsonNode.class).all(
                 (Path<JsonNode> path, Collection<? extends JsonNode> values) -> {
                     final List<? extends Object> strings = new ArrayList<>(values);
+                    
+                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                    filterDescriptorMap.put(path, new ArrayList(values));
+                    
                     Predicate res;
                     try {
                         if (values.isEmpty()) {

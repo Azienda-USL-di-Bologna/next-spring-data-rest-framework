@@ -1,8 +1,6 @@
 package it.nextsw.common.interceptors;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.lang.reflect.Method;
 import java.util.Map;
 
 public class InterceptorParameters {

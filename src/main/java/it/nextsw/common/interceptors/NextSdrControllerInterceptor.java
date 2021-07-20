@@ -1,5 +1,6 @@
 package it.nextsw.common.interceptors;
 
+import com.querydsl.core.types.Path;
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
@@ -7,6 +8,7 @@ import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 
@@ -19,6 +21,13 @@ public interface NextSdrControllerInterceptor {
 
     public final String BEFORE_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "beforeSelectQueryInterceptor";
     public final String AFTER_SELECT_QUERY_INTERCEPTOR_METHOD_NAME = "afterSelectQueryInterceptor";
+    
+    /**
+     * E' una variabile che contiene l'elenco dei filtri 
+     * (chiave: nome campo, valore: valore del filtro (nel caso di campo passato più volte sarà una lista di più di un elmento)) 
+     * richiesti dal client
+     */
+    public static final ThreadLocal<Map<Path<?>, List<Object>>> filterDescriptor = new ThreadLocal();
 
     public enum InterceptorType {BEFORE,AFTER};
 
