@@ -413,9 +413,11 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             res = Expressions.asBoolean(true).isTrue();
                         } else if (values.size() == 1) {
                             // stratagemma per riuscire a filtrare per null.
-                            // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null
+                            // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null e 999999998 come not null
                             if (numbers.get(0) == 999999999) {
                                 res = integerPath.isNull();
+                            } else if (numbers.get(0) == 999999998) {
+                                res = integerPath.isNotNull();
                             } else {
                                 res = integerPath.eq(numbers.get(0));
                             }
