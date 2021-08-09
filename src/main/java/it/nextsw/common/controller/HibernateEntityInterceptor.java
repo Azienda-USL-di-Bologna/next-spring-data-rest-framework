@@ -28,7 +28,7 @@ public class HibernateEntityInterceptor extends EmptyInterceptor {
                 Set<String> keySet = rankQueryMap.keySet();
                 for (String key : keySet) {
                     String placeHolder = "{" + key + ".PLACEHOLDER_TS_RANK}";
-                    String queryString = "'" + rankQueryMap.get(key).trim().replaceAll(" +", "' & '") + "'";
+                    String queryString = "'" + rankQueryMap.get(key).trim().replace("'", "''").replaceAll(" +", "' & '") + "'";
                     sql = sql.replace(placeHolder, queryString);
                 }
             }

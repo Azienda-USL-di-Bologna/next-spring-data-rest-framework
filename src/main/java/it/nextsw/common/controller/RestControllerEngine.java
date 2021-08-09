@@ -1472,9 +1472,6 @@ public abstract class RestControllerEngine {
 //            resource = assembler.toResource(entities);
         }
         
-        // Svuoto il threadLocal
-        HibernateEntityInterceptor.rankQueryObj.remove();
-        
         return resource;
     }
     
