@@ -1,40 +1,56 @@
 package it.nextsw.common.interceptors;
 
+import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Map;
 
-public class ParameterizedInterceptor {
+public final class ParameterizedInterceptor {
 
-    InterceptorParameters parameters;
+    private InterceptorParameters parameters;
 
     private NextSdrControllerInterceptor.InterceptorOperation operation;
     private NextSdrControllerInterceptor.InterceptorType type;
-    // Lista che indica tutto il "percorso" da applicare all'entità principale di lavoro per arrivare alla entità discendente
-    // a cui si riferisce l'interceptor; può contenere o oggetti Method che possono essere invocati direttamente, oppure degli interi
-    // che indicano l'indice da applicare alla collection ottenuta dall'invocazione del metodo presente subito prima
+    
+    /* Lista che indica tutto il "percorso" da applicare all'entità principale di lavoro per arrivare alla entità discendente
+     * a cui si riferisce l'interceptor; può contenere o oggetti Method che possono essere invocati direttamente, oppure degli interi
+     * che indicano l'indice da applicare alla collection ottenuta dall'invocazione del metodo presente subito prima
+    */
     private ArrayList<Object> getMethodsPaths;
 
-    public ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation operation, NextSdrControllerInterceptor.InterceptorType type, InterceptorParameters params){
-        this.setOperation(operation);
-        this.setType(type);
+    public ParameterizedInterceptor(
+            NextSdrControllerInterceptor.InterceptorOperation operation,
+            NextSdrControllerInterceptor.InterceptorType type,
+            InterceptorParameters params) {
+        this.operation = operation;
+        this.type = type;
         this.parameters = params;
     }
 
-    public ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation operation, NextSdrControllerInterceptor.InterceptorType type,  ArrayList<Object> getMethodsPaths, Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projection){
-        this.setOperation(operation);
-        this.setType(type);
+    public ParameterizedInterceptor(
+            NextSdrControllerInterceptor.InterceptorOperation operation,
+            NextSdrControllerInterceptor.InterceptorType type,
+            ArrayList<Object> getMethodsPaths,
+            Object entity,
+            BeforeUpdateEntityApplier beforeUpdateEntityApplier,
+            HttpServletRequest request, Map<String, String> additionalData,
+            boolean mainEntity,
+            Class projection) {
+        this(operation, type, new InterceptorParameters(entity, beforeUpdateEntityApplier, additionalData, request, mainEntity, projection));
         this.setGetMethodsPaths(getMethodsPaths);
-        this.parameters = new InterceptorParameters(entity, beforeUpdateEntity, additionalData, request, mainEntity, projection);
     }
 
-    public ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation operation, NextSdrControllerInterceptor.InterceptorType type, ArrayList<Object> getMethodsPaths, Object entity,  HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projection){
-        this.setOperation(operation);
-        this.setType(type);
+    public ParameterizedInterceptor(
+            NextSdrControllerInterceptor.InterceptorOperation operation,
+            NextSdrControllerInterceptor.InterceptorType type,
+            ArrayList<Object> getMethodsPaths,
+            Object entity,
+            HttpServletRequest request,
+            Map<String, String> additionalData,
+            boolean mainEntity,
+            Class projection) {
+        this(operation, type, new InterceptorParameters(entity, additionalData, request, mainEntity, projection));
         this.setGetMethodsPaths(getMethodsPaths);
-        this.parameters = new InterceptorParameters(entity, additionalData, request, mainEntity, projection);
     }
 
     public InterceptorParameters getParameters() {

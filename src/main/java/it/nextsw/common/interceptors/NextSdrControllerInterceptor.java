@@ -3,6 +3,7 @@ package it.nextsw.common.interceptors;
 import com.querydsl.core.types.Path;
 import com.querydsl.core.types.Predicate;
 import it.nextsw.common.annotations.NextSdrInterceptor;
+import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
@@ -118,6 +119,7 @@ public interface NextSdrControllerInterceptor {
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
     public Object beforeUpdateEntityInterceptor(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
+    public Object beforeUpdateEntityInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di update di un'entità
@@ -132,6 +134,7 @@ public interface NextSdrControllerInterceptor {
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
     public Object afterUpdateEntityInterceptor(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
+    public Object afterUpdateEntityInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
 
 
     /**
