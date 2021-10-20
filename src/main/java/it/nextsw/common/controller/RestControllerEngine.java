@@ -40,7 +40,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.function.UnaryOperator;
 import javax.persistence.EntityManager;
 import javax.persistence.OneToOne;
 import javax.persistence.OptimisticLockException;
@@ -59,10 +58,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
-import org.springframework.data.querydsl.binding.QuerydslBindings;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.server.RepresentationModelAssembler;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -119,8 +116,6 @@ public abstract class RestControllerEngine {
     @Autowired
     private RestControllerInterceptorEngine restControllerInterceptor;
     
-    private ThreadLocal<Object> currentEntity = new ThreadLocal<>();
-    
     /**
      * metodo che restituisce, se esiste, l'entities richiesta prendendola dal
      * repository
@@ -147,7 +142,6 @@ public abstract class RestControllerEngine {
             Optional<Object> entity = generalRepository.findById(objectMapper.convertValue(id, pkType));
             if (entity.isPresent()) {
                 res = entity.get();
-                this.currentEntity.set(res);
             }
         } catch (IllegalArgumentException ex) {
             throw new RestControllerEngineException(ex);
@@ -215,7 +209,6 @@ public abstract class RestControllerEngine {
                         inserting = false;
                         entity = foundEntity;
 //                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
-                        this.currentEntity.set(entity);
                         beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(entity, em);
                     }
                 }
@@ -359,7 +352,6 @@ public abstract class RestControllerEngine {
 
             Object res = entity;
             if (willBeEntityModified) {
-                this.currentEntity.set(entity);
                 BeforeUpdateEntityApplier beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(entity, em);
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
@@ -590,7 +582,6 @@ public abstract class RestControllerEngine {
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
         if (willBeEntityModified && !inserting) {
-            this.currentEntity.set(entity);
             beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(childEntity, em);
         }
         
@@ -1132,7 +1123,6 @@ public abstract class RestControllerEngine {
             if (!inserting) {
                 willBeEntityModified = willBeEntityModified(childEntity, childValue);
                 if (willBeEntityModified) {
-                    this.currentEntity.set(entity);
                     beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(childEntity, em);
                 }
             }
