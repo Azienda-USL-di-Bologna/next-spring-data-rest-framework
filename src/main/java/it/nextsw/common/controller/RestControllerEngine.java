@@ -1246,23 +1246,16 @@ public abstract class RestControllerEngine {
 
     /**
      * Clona un'entità usando jackson. Prima la trasforma in String e poi crea un oggetto a partire dalla quella.
-     * <p>
-     * TODO considerare il fatto che potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} cercare altre soluzioni
+     * usare BeforeUpdateEntityApplier al suo posto, perché con la modalità usata in questa funzione potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} o {@link com.fasterxml.jackson.annotation.JsonBackReference}
      *
      * @param entity l'entità da clonare
      * @return il clone dell'entità
      * @throws IOException
      * @throws EntityReflectionException
      */
+    @Deprecated
     private Object cloneEntity(Object entity) throws IOException, EntityReflectionException {
         return objectMapper.readValue(objectMapper.writeValueAsString(entity), EntityReflectionUtils.getEntityFromProxyObject(entity));
-    }
-    
-    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public void manageCloned(UnaryOperator<Object> fn) throws NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-        Object currentEntityObj = this.currentEntity.get();
-        Object entityBeforeModify = em.find(currentEntityObj.getClass(), EntityReflectionUtils.getPrimaryKeyValue(currentEntityObj));
-        fn.apply(entityBeforeModify);
     }
 
     /**
