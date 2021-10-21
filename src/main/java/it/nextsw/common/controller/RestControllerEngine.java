@@ -107,6 +107,9 @@ public abstract class RestControllerEngine {
     @Autowired
     @Qualifier(value = "projectionsMap")
     protected Map<String, Class> projectionsMap;
+    
+    @Autowired
+    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
 
     // Lista in cui vengono salvati tutti gli interceptor di tipo BeforeCreate, BeforeUpdate e BeforeDelete che si tenta di lanciare
     // durante le varie procedure di aggiornamento; verrà valutata dopo il salvataggio dell'entità per richiamare eventuali
@@ -184,9 +187,6 @@ public abstract class RestControllerEngine {
             Object entity = entityClass.newInstance();
             boolean inserting = true;
 
-            // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
-            BeforeUpdateEntityApplier beforeUpdateEntityApplier = null;
-
             /*
              * se ho un id seriale e ho passato un id nell'oggetto da inserire lo elimino (nell'inserimento l'id sarà calcolato e non deve essere
              * considerato se passato).
@@ -209,7 +209,8 @@ public abstract class RestControllerEngine {
                         inserting = false;
                         entity = foundEntity;
 //                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
-                        beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(entity, em);
+                        // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
+                        beforeUpdateEntityApplier.setCurrentEntity(entity);
                     }
                 }
             }
@@ -352,7 +353,7 @@ public abstract class RestControllerEngine {
 
             Object res = entity;
             if (willBeEntityModified) {
-                BeforeUpdateEntityApplier beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(entity, em);
+                beforeUpdateEntityApplier.setCurrentEntity(entity);
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
                 res = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
@@ -555,7 +556,6 @@ public abstract class RestControllerEngine {
         Class childEntityClass = field.getType();
         boolean inserting = false;
         Object childEntity = getMethod.invoke(entity);
-        BeforeUpdateEntityApplier beforeUpdateEntityApplier = null;
         childEntity = extractCorrectChildEntity(value, childEntity, childEntityClass);
         if (childEntity == null) {
             inserting = true;
@@ -582,7 +582,7 @@ public abstract class RestControllerEngine {
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
         if (willBeEntityModified && !inserting) {
-            beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(childEntity, em);
+            beforeUpdateEntityApplier.setCurrentEntity(childEntity);
         }
         
 //        if (ancestorsFk == null) {
@@ -1118,12 +1118,11 @@ public abstract class RestControllerEngine {
 //                ancestorsFk.add(new ImmutablePair(entity.getClass(), entity));
             }
 
-            BeforeUpdateEntityApplier beforeUpdateEntityApplier = null;
             boolean willBeEntityModified = false;
             if (!inserting) {
                 willBeEntityModified = willBeEntityModified(childEntity, childValue);
                 if (willBeEntityModified) {
-                    beforeUpdateEntityApplier = new BeforeUpdateEntityApplier(childEntity, em);
+                    beforeUpdateEntityApplier.setCurrentEntity(childEntity);
                 }
             }
 
