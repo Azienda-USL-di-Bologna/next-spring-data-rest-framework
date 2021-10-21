@@ -4,8 +4,6 @@ import it.nextsw.common.controller.exceptions.BeforeUpdateEntityApplierException
 import it.nextsw.common.utils.EntityReflectionUtils;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
@@ -23,14 +21,8 @@ public class BeforeUpdateEntityApplier {
     @PersistenceContext
     private EntityManager entityManager;
 
-//    public BeforeUpdateEntityApplier(Object currentEntity, EntityManager entityManager) {
-//       this.currentEntity = currentEntity;
-//       this.entityManager = entityManager;
-//    }
-    
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void beforeUpdateApply(Consumer<Object> fn) throws BeforeUpdateEntityApplierException {
-//        Object currentEntityObj = this.currentEntity.get();
         Object entityBeforeModify;
         try {
             entityBeforeModify = entityManager.find(currentEntity.get().getClass(), EntityReflectionUtils.getPrimaryKeyValue(currentEntity.get()));
@@ -46,6 +38,4 @@ public class BeforeUpdateEntityApplier {
     public void setCurrentEntity(Object currentEntity) {
         this.currentEntity.set(currentEntity);
     }
-    
-    
 }
