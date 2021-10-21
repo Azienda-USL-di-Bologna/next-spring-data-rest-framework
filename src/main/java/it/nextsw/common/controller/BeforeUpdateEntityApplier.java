@@ -19,16 +19,14 @@ public class BeforeUpdateEntityApplier {
 
     private final ThreadLocal<Object> currentEntity = new ThreadLocal<>();
 
-//    @PersistenceContext
-    private final ThreadLocal<EntityManager> entityManager = new ThreadLocal<>();
-
-    ;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void beforeUpdateApply(Consumer<Object> fn) throws BeforeUpdateEntityApplierException {
         Object entityBeforeModify;
         try {
-            entityBeforeModify = entityManager.get().find(EntityReflectionUtils.getEntityFromProxyObject(currentEntity.get()), EntityReflectionUtils.getPrimaryKeyValue(currentEntity.get()));
+            entityBeforeModify = entityManager.find(EntityReflectionUtils.getEntityFromProxyObject(currentEntity.get()), EntityReflectionUtils.getPrimaryKeyValue(currentEntity.get()));
             fn.accept(entityBeforeModify);
         } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             throw new BeforeUpdateEntityApplierException("errore nel reperire l'entità prima delle modifiche dal database", ex);
@@ -38,8 +36,7 @@ public class BeforeUpdateEntityApplier {
 
     }
 
-    public void setCurrentEntity(Object currentEntity, EntityManager entityManager) {
+    public void setCurrentEntity(Object currentEntity) {
         this.currentEntity.set(currentEntity);
-        this.entityManager.set(entityManager);
     }
 }
