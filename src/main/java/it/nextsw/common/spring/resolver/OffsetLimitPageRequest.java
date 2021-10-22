@@ -75,4 +75,9 @@ public class OffsetLimitPageRequest implements Pageable {
     public boolean hasPrevious() {
         return false;
     }
+
+    @Override
+    public Pageable withPage(int pageNumber) {
+        return new OffsetLimitPageRequest(pageNumber*limit, limit, sort);
+    }
 }

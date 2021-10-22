@@ -303,7 +303,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                 }
                                 
                                 if (Field.class.isAssignableFrom(annotatedElement.getClass())) {
-                                    rankQueryMap.put(((Field)annotatedElement).getName(), buildingRankQuery);
+                                    rankQueryMap.put(((Field)annotatedElement).getAnnotation(Column.class).name(), buildingRankQuery);
                                 }
                                 
                                 res = booleanTemplate;

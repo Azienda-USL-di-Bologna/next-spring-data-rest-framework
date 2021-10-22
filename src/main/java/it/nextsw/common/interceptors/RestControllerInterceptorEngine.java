@@ -1,6 +1,7 @@
 package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Predicate;
+import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
@@ -111,25 +112,25 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeUpdateInterceptor(Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executebeforeUpdateInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        log.info(String.format("find %s interceptors on %s...", "beforeUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
 //                log.info(String.format("execute %s on %s", "beforeUpdateEntityInterceptor", entity.toString()));
-                entity = interceptor.beforeUpdateEntityInterceptor(entity, beforeUpdateEntity, additionalData, request, mainEntity, projectionClass);
+                entity = interceptor.beforeUpdateEntityInterceptor(entity, beforeUpdateEntityApplier, additionalData, request, mainEntity, projectionClass);
             }
         }
         return entity;
     }
 
-    public Object executeafterUpdateInterceptor(Object entity, Object beforeUpdateEntity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executeafterUpdateInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        log.info(String.format("find %s interceptors on %s...", "afterUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
 //                log.info(String.format("execute %s on %s", "afterUpdateEntityInterceptor", entity.toString()));
-                entity = interceptor.afterUpdateEntityInterceptor(entity, beforeUpdateEntity, additionalData, request, mainEntity, projectionClass);
+                entity = interceptor.afterUpdateEntityInterceptor(entity, beforeUpdateEntityApplier, additionalData, request, mainEntity, projectionClass);
             }
         }
         return entity;

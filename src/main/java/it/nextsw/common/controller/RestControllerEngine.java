@@ -58,7 +58,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
-import org.springframework.data.querydsl.binding.QuerydslBindings;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,10 +72,6 @@ import org.springframework.util.StringUtils;
 public abstract class RestControllerEngine {
 
     private final Logger LOGGER = LoggerFactory.getLogger(RestControllerEngine.class);
-
-
-    @Autowired
-    private RestControllerInterceptorEngine restControllerInterceptor;
 
     @Autowired
     protected ProjectionFactory factory;
@@ -97,12 +92,7 @@ public abstract class RestControllerEngine {
     protected EntityManager em;
 
     @Autowired
-    ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
-
-    // Lista in cui vengono salvati tutti gli interceptor di tipo BeforeCreate, BeforeUpdate e BeforeDelete che si tenta di lanciare
-    // durante le varie procedure di aggiornamento; verrà valutata dopo il salvataggio dell'entità per richiamare eventuali
-    // interceptor di tipo AfterCreate, AfterUpdate e AfterDelete
-    private ArrayList<ParameterizedInterceptor> launchedBeforeInterceptors = new ArrayList<ParameterizedInterceptor>();
+    protected ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
 
     /**
      * mappa dei repository in cui la chiave è il path completo (baseUrl + "/" + repositoryPath, es. /resources/baborg-api/azienda)
@@ -117,7 +107,18 @@ public abstract class RestControllerEngine {
     @Autowired
     @Qualifier(value = "projectionsMap")
     protected Map<String, Class> projectionsMap;
+    
+    @Autowired
+    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
 
+    // Lista in cui vengono salvati tutti gli interceptor di tipo BeforeCreate, BeforeUpdate e BeforeDelete che si tenta di lanciare
+    // durante le varie procedure di aggiornamento; verrà valutata dopo il salvataggio dell'entità per richiamare eventuali
+    // interceptor di tipo AfterCreate, AfterUpdate e AfterDelete
+    private List<ParameterizedInterceptor> launchedBeforeInterceptors = new ArrayList();
+
+    @Autowired
+    private RestControllerInterceptorEngine restControllerInterceptor;
+    
     /**
      * metodo che restituisce, se esiste, l'entities richiesta prendendola dal
      * repository
@@ -186,9 +187,6 @@ public abstract class RestControllerEngine {
             Object entity = entityClass.newInstance();
             boolean inserting = true;
 
-            // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
-            Object beforeUpdateEntity = null;
-
             /*
              * se ho un id seriale e ho passato un id nell'oggetto da inserire lo elimino (nell'inserimento l'id sarà calcolato e non deve essere
              * considerato se passato).
@@ -211,7 +209,8 @@ public abstract class RestControllerEngine {
                         inserting = false;
                         entity = foundEntity;
 //                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
-                        beforeUpdateEntity = cloneEntity(entity);
+                        // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
+                        beforeUpdateEntityApplier.setCurrentEntity(entity);
                     }
                 }
             }
@@ -229,7 +228,7 @@ public abstract class RestControllerEngine {
             if (inserting) {
                 entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData, true, projectionClass);
             } else {
-                entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
             }
 
             // salvataggio dell'entità
@@ -238,7 +237,7 @@ public abstract class RestControllerEngine {
             if (inserting) {
                 entity = restControllerInterceptor.executeafterCreateInterceptor(entity, request, additionalData, true, projectionClass);
             } else {
-                entity = restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
             }
 
             // Lancio gli interceptor after anche sulle entità correlate
@@ -354,17 +353,17 @@ public abstract class RestControllerEngine {
 
             Object res = entity;
             if (willBeEntityModified) {
-                Object beforeUpdateEntity = cloneEntity(entity);
+                beforeUpdateEntityApplier.setCurrentEntity(entity);
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
                 res = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
 
-                restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData, true, projectionClass);
+                restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
 
                 // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
-                restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData, true, projectionClass);
+                restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
 
                 // Lancio gli interceptor after anche sulle entità correlate
                 restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
@@ -557,7 +556,6 @@ public abstract class RestControllerEngine {
         Class childEntityClass = field.getType();
         boolean inserting = false;
         Object childEntity = getMethod.invoke(entity);
-        Object beforeUpdateEntity = null;
         childEntity = extractCorrectChildEntity(value, childEntity, childEntityClass);
         if (childEntity == null) {
             inserting = true;
@@ -583,9 +581,9 @@ public abstract class RestControllerEngine {
         }
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
-        if (willBeEntityModified && !inserting)
-            beforeUpdateEntity = cloneEntity(childEntity);
-        
+        if (willBeEntityModified && !inserting) {
+            beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+        }
         
 //        if (ancestorsFk == null) {
 //            ancestorsFk = new ArrayList();
@@ -598,9 +596,9 @@ public abstract class RestControllerEngine {
             launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
                     childEntity,request, additionalDataMap, false, projectionClass));
         } else if (willBeEntityModified) {
-            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap, false, projectionClass);
+            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass);
             launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
-                    childEntity, beforeUpdateEntity, request, additionalDataMap, false, projectionClass));
+                    childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass));
         }
         setMethod.invoke(entity, childEntity);
     }
@@ -1120,12 +1118,12 @@ public abstract class RestControllerEngine {
 //                ancestorsFk.add(new ImmutablePair(entity.getClass(), entity));
             }
 
-            Object beforeUpdateEntity = null;
             boolean willBeEntityModified = false;
             if (!inserting) {
                 willBeEntityModified = willBeEntityModified(childEntity, childValue);
-                if (willBeEntityModified)
-                    beforeUpdateEntity = cloneEntity(childEntity);
+                if (willBeEntityModified) {
+                    beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+                }
             }
 
             // Aggiungo alla lista di metodi get l'indice che l'entità su cui sto lavorando ha nella collection
@@ -1140,9 +1138,9 @@ public abstract class RestControllerEngine {
                         childEntity,request, additionalDataMap, false, projectionClass));
 
             } else if (willBeEntityModified) {
-                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap, false, projectionClass);
+                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass);
                 launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
-                        childEntity, beforeUpdateEntity, request, additionalDataMap, false, projectionClass));
+                        childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass));
             }
             // Rimuovo l'indice prima inserito (in modo che non compaia nella lista passata ad interceptor di altre entità di questa collection)
             getMethodsPath.remove(getMethodsPath.size()-1);
@@ -1237,14 +1235,14 @@ public abstract class RestControllerEngine {
 
     /**
      * Clona un'entità usando jackson. Prima la trasforma in String e poi crea un oggetto a partire dalla quella.
-     * <p>
-     * TODO considerare il fatto che potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} cercare altre soluzioni
+     * usare BeforeUpdateEntityApplier al suo posto, perché con la modalità usata in questa funzione potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} o {@link com.fasterxml.jackson.annotation.JsonBackReference}
      *
      * @param entity l'entità da clonare
      * @return il clone dell'entità
      * @throws IOException
      * @throws EntityReflectionException
      */
+    @Deprecated
     private Object cloneEntity(Object entity) throws IOException, EntityReflectionException {
         return objectMapper.readValue(objectMapper.writeValueAsString(entity), EntityReflectionUtils.getEntityFromProxyObject(entity));
     }

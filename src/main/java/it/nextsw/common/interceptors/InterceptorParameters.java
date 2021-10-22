@@ -1,38 +1,34 @@
 package it.nextsw.common.interceptors;
 
+import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Map;
 
 public class InterceptorParameters {
 
-    Object entity;
+    private Object entity;
 
-    Object beforeUpdateEntity;
+    private BeforeUpdateEntityApplier beforeUpdateEntityApplier;
 
-    Map<String, String> additionalData;
+    private Map<String, String> additionalData;
 
-    HttpServletRequest request;
+    private HttpServletRequest request;
 
-    boolean mainEntity;
+    private boolean mainEntity;
 
-    Class projection;
-
-
-    public InterceptorParameters(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projection){
-        this.setEntity(entity);
-        this.setBeforeUpdateEntity(beforeUpdateEntity);
-        this.setAdditionalData(additionalData);
-        this.setRequest(request);
-        this.setMainEntity(mainEntity);
-        this.setProjection(projection);
-    }
+    private Class projection;
 
     public InterceptorParameters(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projection){
-        this.setEntity(entity);
-        this.setAdditionalData(additionalData);
-        this.setRequest(request);
-        this.setMainEntity(mainEntity);
-        this.setProjection(projection);
+        this.entity = entity;
+        this.additionalData = additionalData;
+        this.request = request;
+        this.mainEntity = mainEntity;
+        this.projection = projection;
+    }
+
+    public InterceptorParameters(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projection){
+        this(entity, additionalData, request, mainEntity, projection);
+        this.beforeUpdateEntityApplier = beforeUpdateEntityApplier;
     }
 
     public Object getEntity() {
@@ -43,12 +39,12 @@ public class InterceptorParameters {
         this.entity = entity;
     }
 
-    public Object getBeforeUpdateEntity() {
-        return beforeUpdateEntity;
+    public BeforeUpdateEntityApplier getBeforeUpdateEntity() {
+        return beforeUpdateEntityApplier;
     }
 
-    public void setBeforeUpdateEntity(Object beforeUpdateEntity) {
-        this.beforeUpdateEntity = beforeUpdateEntity;
+    public void setBeforeUpdateEntity(BeforeUpdateEntityApplier beforeUpdateEntityApplier) {
+        this.beforeUpdateEntityApplier = beforeUpdateEntityApplier;
     }
 
     public Map<String, String> getAdditionalData() {
