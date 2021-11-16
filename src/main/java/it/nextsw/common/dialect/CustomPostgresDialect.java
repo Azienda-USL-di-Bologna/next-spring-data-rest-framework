@@ -11,6 +11,7 @@ public class CustomPostgresDialect extends PostgreSQL94Dialect {
         this.registerFunction("fts_match", new PostgreSQLFullTextSearchFunction());
         this.registerFunction("array_operation", new PostgresArrayFunctions());
         this.registerFunction("bitand", new SQLFunctionTemplate(IntegerType.INSTANCE, "(?1 & ?2)"));
+        this.registerFunction("jsonb_contains", new PostgreSQLJsonbFunction());
     }
 
 }

@@ -41,6 +41,12 @@ public class PostgreSQLFullTextSearchFunction implements SQLFunction {
             value = (String) arguments.get(2);
             // tolgo gli apici all'inizio e alla fine della stringa
             value = value.substring(1, value.length() - 1);
+            
+            // al posto di alcuni caratteri speciali, inserisco uno spazio
+            value = value
+                    .replace("@", " ")
+                    .replace(".", " ");
+            
             // al posto degli spazi metto le & per fare la ricerca in and e :* per trovare anche le parole che hanno la stringa come radice
             value = value.trim().replaceAll("\\s+", ":*&");
             
