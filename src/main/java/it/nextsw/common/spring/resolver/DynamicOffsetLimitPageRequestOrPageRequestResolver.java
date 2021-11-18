@@ -56,19 +56,22 @@ public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends Pageable
     public Pageable resolveArgument(MethodParameter parameter, ModelAndViewContainer container, NativeWebRequest request, WebDataBinderFactory factory){
         Map<String,String[]> params = request.getParameterMap();
         Sort sort = sortResolver.resolveArgument(parameter, container, request, factory);
-        if (params.get(OFFSET_PARAMETER) != null || params.get(LIMIT_PARAMETER) != null)
+        if (params.get(OFFSET_PARAMETER) != null || params.get(LIMIT_PARAMETER) != null) {
             return new OffsetLimitPageRequest(
                     params.get(OFFSET_PARAMETER)[0], 
                     params.get(LIMIT_PARAMETER)[0], 
                     sort,
                     params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
             );
-
-        return new NextSdrPageable(
-                params.get(PAGE_PARAMETER)[0], 
-                params.get(SIZE_PARAMETER)[0], 
-                sort, 
-                params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
-        );
+        } else if (params.get(PAGE_PARAMETER) != null && params.get(SIZE_PARAMETER) != null) {
+            return new NextSdrPageable(
+                    params.get(PAGE_PARAMETER)[0], 
+                    params.get(SIZE_PARAMETER)[0], 
+                    sort, 
+                    params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
+            );
+        }
+        
+        return Pageable.unpaged();
     }
 }
