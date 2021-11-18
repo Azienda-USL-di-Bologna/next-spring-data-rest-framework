@@ -25,8 +25,11 @@ import java.util.Map;
 public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends PageableHandlerMethodArgumentResolver {
 
     protected static final SortHandlerMethodArgumentResolver DEFAULT_SORT_RESOLVER = new SortHandlerMethodArgumentResolver();
-    protected static final String DEFAULT_OFFSET_PARAMETER = "pagingOffset";
-    protected static final String DEFAULT_LIMIT_PARAMETER = "pagingLimit";
+    protected static final String OFFSET_PARAMETER = "pagingOffset";
+    protected static final String LIMIT_PARAMETER = "pagingLimit";
+    protected static final String PAGE_PARAMETER = "page";
+    protected static final String SIZE_PARAMETER = "size";
+    protected static final String NO_COUNT_PARAMETER = "noCount";
 
     protected SortArgumentResolver sortResolver;
 
@@ -53,9 +56,19 @@ public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends Pageable
     public Pageable resolveArgument(MethodParameter parameter, ModelAndViewContainer container, NativeWebRequest request, WebDataBinderFactory factory){
         Map<String,String[]> params = request.getParameterMap();
         Sort sort = sortResolver.resolveArgument(parameter, container, request, factory);
-        if (params.get(DEFAULT_OFFSET_PARAMETER) != null || params.get(DEFAULT_LIMIT_PARAMETER) != null)
-            return new OffsetLimitPageRequest( params.get(DEFAULT_OFFSET_PARAMETER)[0], params.get(DEFAULT_LIMIT_PARAMETER)[0], sort);
+        if (params.get(OFFSET_PARAMETER) != null || params.get(LIMIT_PARAMETER) != null)
+            return new OffsetLimitPageRequest(
+                    params.get(OFFSET_PARAMETER)[0], 
+                    params.get(LIMIT_PARAMETER)[0], 
+                    sort,
+                    params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
+            );
 
-        return super.resolveArgument(parameter, container, request, factory);
+        return new NextSdrPageable(
+                params.get(PAGE_PARAMETER)[0], 
+                params.get(SIZE_PARAMETER)[0], 
+                sort, 
+                params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
+        );
     }
 }

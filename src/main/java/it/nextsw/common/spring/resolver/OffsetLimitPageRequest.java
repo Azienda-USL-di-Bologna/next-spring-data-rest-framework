@@ -15,9 +15,10 @@ public class OffsetLimitPageRequest implements Pageable {
     private int offset;
     private int limit;
     private Sort sort;
+    private boolean noCount;
 
 
-    public OffsetLimitPageRequest(Integer offset, Integer limit, Sort sort){
+    public OffsetLimitPageRequest(Integer offset, Integer limit, Sort sort, Boolean noCount){
        // super(offset,limit);
         if (limit == null)
             limit = LIMIT_DEAFULT_VALUE;
@@ -26,13 +27,22 @@ public class OffsetLimitPageRequest implements Pageable {
         if (limit == 0){
             throw new IllegalArgumentException("Limit cannot be 0 (zero)");
         }
+        if (noCount == null) {
+            noCount = false;
+        }
         this.offset = offset;
         this.limit = limit;
         this.sort = sort;
+        this.noCount = noCount;
     }
 
-    public OffsetLimitPageRequest(String offset, String limit, Sort sort){
-        this(offset != null ? Integer.parseInt(offset) : null, limit != null ? Integer.parseInt(limit) : null, sort!= null ? sort : Sort.unsorted());
+    public OffsetLimitPageRequest(String offset, String limit, Sort sort, String noCount){
+        this(
+                offset != null ? Integer.parseInt(offset) : null, 
+                limit != null ? Integer.parseInt(limit) : null, 
+                sort!= null ? sort : Sort.unsorted(),
+                Boolean.parseBoolean(noCount)
+        );
     }
 
     @Override
@@ -54,6 +64,10 @@ public class OffsetLimitPageRequest implements Pageable {
     @Override
     public Sort getSort() {
         return this.sort;
+    }
+    
+    public boolean getNoCount() {
+        return this.noCount;
     }
 
     @Override
@@ -78,6 +92,6 @@ public class OffsetLimitPageRequest implements Pageable {
 
     @Override
     public Pageable withPage(int pageNumber) {
-        return new OffsetLimitPageRequest(pageNumber*limit, limit, sort);
+        return new OffsetLimitPageRequest(pageNumber*limit, limit, sort, noCount);
     }
 }
