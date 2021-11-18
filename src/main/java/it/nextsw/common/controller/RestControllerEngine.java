@@ -25,6 +25,8 @@ import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
+import it.nextsw.common.spring.resolver.NextSdrPageable;
+import it.nextsw.common.spring.resolver.OffsetLimitPageRequest;
 
 import java.io.IOException;
 
@@ -1401,6 +1403,7 @@ public abstract class RestControllerEngine {
          * Spring ha una mappa dove la chiave ha il nome della classe in lowerCamelcase mentre il valore corrisponde al valore dei repository
          */
         NextSdrQueryDslRepository generalRepository = getGeneralRepository(request, id != null);
+
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, generalRepository);
@@ -1448,7 +1451,14 @@ public abstract class RestControllerEngine {
              * caso in cui non è stato passato un id specifico da ricercare,
              * quindi lo devo fare su tutti i record di una classe
              */
-            Page entities = generalRepository.findAll(predicate, pageable);
+            Page entities;
+            if ((OffsetLimitPageRequest.class.isAssignableFrom(pageable.getClass()) && ((OffsetLimitPageRequest)pageable).getNoCount())
+                    || (NextSdrPageable.class.isAssignableFrom(pageable.getClass()) && ((NextSdrPageable)pageable).getNoCount())){ // Boolean.parseBoolean(request.getParameter("noCount"))
+                entities = generalRepository.findAllNoCount(predicate, pageable);
+            } else {
+                entities = generalRepository.findAll(predicate, pageable);
+            }
+            
             try {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
