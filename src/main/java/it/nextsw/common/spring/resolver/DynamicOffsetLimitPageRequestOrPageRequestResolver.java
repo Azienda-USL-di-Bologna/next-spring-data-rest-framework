@@ -72,6 +72,6 @@ public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends Pageable
             );
         }
         
-        return Pageable.unpaged();
+        return super.resolveArgument(parameter, container, request, factory);
     }
 }
