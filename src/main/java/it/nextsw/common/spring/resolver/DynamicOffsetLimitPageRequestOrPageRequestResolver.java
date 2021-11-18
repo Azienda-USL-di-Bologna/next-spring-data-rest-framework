@@ -30,6 +30,7 @@ public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends Pageable
     protected static final String PAGE_PARAMETER = "page";
     protected static final String SIZE_PARAMETER = "size";
     protected static final String NO_COUNT_PARAMETER = "noCount";
+    protected static final String UNPAGED_PARAMETER = "unpaged";
 
     protected SortArgumentResolver sortResolver;
 
@@ -70,6 +71,8 @@ public class DynamicOffsetLimitPageRequestOrPageRequestResolver extends Pageable
                     sort, 
                     params.get(NO_COUNT_PARAMETER) != null ? params.get(NO_COUNT_PARAMETER)[0] : null
             );
+        } else if (params.get(UNPAGED_PARAMETER) != null && Boolean.parseBoolean(params.get(UNPAGED_PARAMETER)[0])) {
+            return Pageable.unpaged();
         }
         
         return super.resolveArgument(parameter, container, request, factory);
