@@ -109,7 +109,7 @@ public interface NextSdrControllerInterceptor {
     /**
      * Questo metodo viene eseguito prima di una query di update di un'entità
      * @param entity l'entità che sta per essere aggiornata (update)
-     * @param beforeUpdateEntity l'entità iniziale, senza che siano state fatte le modifiche passate nel body della richiesta
+     * @param beforeUpdateEntityApplier il puntatore all'entità iniziale, senza che siano state fatte le modifiche passate nel body della richiesta
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @param mainEntity indica se l'interceptor è eseguito sull'entità principale su cui è stata fatta la richiesta o
@@ -118,13 +118,12 @@ public interface NextSdrControllerInterceptor {
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object beforeUpdateEntityInterceptor(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
     public Object beforeUpdateEntityInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
 
     /**
      * Questo metodo viene eseguito prima di una query di update di un'entità
      * @param entity l'entità che sta per essere aggiornata (update)
-     * @param beforeUpdateEntity l'entità iniziale, senza che siano state fatte le modifiche passate nel body della richiesta
+     * @param beforeUpdateEntityApplier puntatore all'entità iniziale, senza che siano state fatte le modifiche passate nel body della richiesta
      * @param additionalData parametri aggiuntivi che possono essere inviati al webservices
      * @param request la request della chiamata
      * @param mainEntity indica se l'interceptor è eseguito sull'entità principale su cui è stata fatta la richiesta o
@@ -133,7 +132,6 @@ public interface NextSdrControllerInterceptor {
      * @return l'oggetto con eventuali modifiche che verrà poi salvato
      * @throws AbortSaveInterceptorException se viene lanciata questa eccezione la transazione attuale va in rollback
      */
-    public Object afterUpdateEntityInterceptor(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
     public Object afterUpdateEntityInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException;
 
 
