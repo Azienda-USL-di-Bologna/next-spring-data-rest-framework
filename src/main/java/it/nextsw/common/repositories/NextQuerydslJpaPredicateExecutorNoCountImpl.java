@@ -76,14 +76,14 @@ public class NextQuerydslJpaPredicateExecutorNoCountImpl<E extends Object, ID ex
 
     @Override
     public Page<T> findAll(Predicate predicate, Pageable pageable) {
-        System.out.println("in findall");
+//        System.out.println("in findall");
         return super.findAll(predicate, pageable);
 //        return findAllNoCount(predicate, pageable);
     }
     
     @Override
     public Page<T> findAllNoCount(Predicate predicate, Pageable pageable) {
-        System.out.println("in findall NO COUNT");
+//        System.out.println("in findall NO COUNT");
         int oneMore = pageable.getPageSize() + 1;
         JPQLQuery query = (JPQLQuery) createQuery(predicate)
                 .offset(pageable.getOffset())
