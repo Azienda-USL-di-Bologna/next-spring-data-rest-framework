@@ -62,7 +62,7 @@ public abstract class NextSdrEmptyControllerInterceptor implements NextSdrContro
     public void afterDeleteEntityInterceptor(Object entity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projectionClass) throws AbortSaveInterceptorException, SkipDeleteInterceptorException {
     }
     
-    public <T extends Object> T getBeforeUpdateEntity(BeforeUpdateEntityApplier beforeUpdateEntityApplier, Class<T> entityClass) throws BeforeUpdateEntityApplierException{
+    public <T> T getBeforeUpdateEntity(BeforeUpdateEntityApplier beforeUpdateEntityApplier, Class<T> entityClass) throws BeforeUpdateEntityApplierException{
         List<T> lista = new ArrayList();
 
         beforeUpdateEntityApplier.beforeUpdateApply(entityBeforeUpdate -> {

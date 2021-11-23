@@ -39,4 +39,8 @@ public class BeforeUpdateEntityApplier {
     public void setCurrentEntity(Object currentEntity) {
         this.currentEntity.set(currentEntity);
     }
+    
+    public Object getCurrentEntity() {
+        return this.currentEntity.get();
+    }
 }
