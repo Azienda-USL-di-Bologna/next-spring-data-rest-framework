@@ -33,8 +33,11 @@ public class RestControllerInterceptorEngine {
     private static final Logger log = LoggerFactory.getLogger(RestControllerInterceptorEngine.class);
 
     @PersistenceContext
-    EntityManager em;
+    private EntityManager em;
 
+    @Autowired
+    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
+    
     @Autowired
     @Qualifier(value = "interceptorsMap")
     protected Map<String, List<NextSdrControllerInterceptor>> interceptorsMap;
@@ -51,7 +54,6 @@ public class RestControllerInterceptorEngine {
     }
 
     public Object executeAfterSelectQueryInterceptor(Object entity, Collection<Object> entities, Class entityClass, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws AbortLoadInterceptorException, ClassNotFoundException, InterceptorException, EntityReflectionException {
-
         Object res = null;
 
         if (entity != null) {
@@ -86,7 +88,7 @@ public class RestControllerInterceptorEngine {
         return res;
     }
 
-    public Object executebeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executeBeforeCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
 //        log.info(String.format("find %s interceptors on %s...", "beforeCreateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
@@ -99,7 +101,7 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executeafterCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executeAfterCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
 //        log.info(String.format("find %s interceptors on %s...", "afterCreateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
@@ -112,8 +114,9 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeUpdateInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executeBeforeUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        log.info(String.format("find %s interceptors on %s...", "beforeUpdateEntityInterceptor", entity.toString()));
+        this.beforeUpdateEntityApplier.setCurrentEntity(entity);        
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
@@ -124,7 +127,8 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executeafterUpdateInterceptor(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+    public Object executeAfterUpdateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
+        this.beforeUpdateEntityApplier.setCurrentEntity(entity); 
 //        log.info(String.format("find %s interceptors on %s...", "afterUpdateEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
@@ -136,7 +140,7 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executebeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
+    public Object executeBeforeDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
 //        log.info(String.format("find %s interceptors on %s...", "beforeDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
@@ -148,7 +152,7 @@ public class RestControllerInterceptorEngine {
         return entity;
     }
 
-    public Object executeafterDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
+    public Object executeAfterDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException {
 //        log.info(String.format("find %s interceptors on %s...", "afterDeleteEntityInterceptor", entity.toString()));
         List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
         if (interceptors != null) {
@@ -203,10 +207,10 @@ public class RestControllerInterceptorEngine {
                     ArrayList<Object> getMethodsPath = launchedInterceptor.getGetMethodsPaths();
                     Object entity = getEntityFromPath(mainEntity, getMethodsPath);
                     if (entity != null)
-                        executeafterCreateInterceptor(entity, params.getRequest(), params.getAdditionalData(), params.isMainEntity(), params.getProjection());
+                        executeAfterCreateInterceptor(entity, params.getRequest(), params.getAdditionalData(), params.isMainEntity(), params.getProjection());
                     break;
                 case UPDATE:
-                    executeafterUpdateInterceptor(params.getEntity(), params.getBeforeUpdateEntity(), params.getRequest(), params.getAdditionalData(), params.isMainEntity(), params.getProjection());
+                    executeAfterUpdateInterceptor(params.getEntity(), params.getRequest(), params.getAdditionalData(), params.isMainEntity(), params.getProjection());
                     break;
                 case DELETE:
                     launchNestedDeleteInterceptor(params.getEntity(), params.getRequest(), params.getAdditionalData(), new HashMap(),
@@ -302,8 +306,8 @@ public class RestControllerInterceptorEngine {
             }
         }
         if (interceptorType == NextSdrControllerInterceptor.InterceptorType.BEFORE)
-            executebeforeDeleteInterceptor(entity, request, additionalData, mainEntity, projectionClass);
+            executeBeforeDeleteInterceptor(entity, request, additionalData, mainEntity, projectionClass);
         else
-            executeafterDeleteInterceptor(entity, request, additionalData, mainEntity, projectionClass);
+            executeAfterDeleteInterceptor(entity, request, additionalData, mainEntity, projectionClass);
     }
 }

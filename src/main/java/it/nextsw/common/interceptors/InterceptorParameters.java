@@ -8,7 +8,7 @@ public class InterceptorParameters {
 
     private Object entity;
 
-    private BeforeUpdateEntityApplier beforeUpdateEntityApplier;
+    private Object beforeUpdateEntity;
 
     private Map<String, String> additionalData;
 
@@ -26,9 +26,9 @@ public class InterceptorParameters {
         this.projection = projection;
     }
 
-    public InterceptorParameters(Object entity, BeforeUpdateEntityApplier beforeUpdateEntityApplier, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projection){
+    public InterceptorParameters(Object entity, Object beforeUpdateEntity, Map<String, String> additionalData, HttpServletRequest request, boolean mainEntity, Class projection){
         this(entity, additionalData, request, mainEntity, projection);
-        this.beforeUpdateEntityApplier = beforeUpdateEntityApplier;
+        this.beforeUpdateEntity = beforeUpdateEntity;
     }
 
     public Object getEntity() {
@@ -39,12 +39,12 @@ public class InterceptorParameters {
         this.entity = entity;
     }
 
-    public BeforeUpdateEntityApplier getBeforeUpdateEntity() {
-        return beforeUpdateEntityApplier;
+    public Object getBeforeUpdateEntity() {
+        return beforeUpdateEntity;
     }
 
-    public void setBeforeUpdateEntity(BeforeUpdateEntityApplier beforeUpdateEntityApplier) {
-        this.beforeUpdateEntityApplier = beforeUpdateEntityApplier;
+    public void setBeforeUpdateEntity(Object beforeUpdateEntity) {
+        this.beforeUpdateEntity = beforeUpdateEntity;
     }
 
     public Map<String, String> getAdditionalData() {

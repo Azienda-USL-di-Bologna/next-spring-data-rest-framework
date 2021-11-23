@@ -110,8 +110,8 @@ public abstract class RestControllerEngine {
     @Qualifier(value = "projectionsMap")
     protected Map<String, Class> projectionsMap;
     
-    @Autowired
-    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
+//    @Autowired
+//    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
 
     // Lista in cui vengono salvati tutti gli interceptor di tipo BeforeCreate, BeforeUpdate e BeforeDelete che si tenta di lanciare
     // durante le varie procedure di aggiornamento; verrà valutata dopo il salvataggio dell'entità per richiamare eventuali
@@ -193,6 +193,7 @@ public abstract class RestControllerEngine {
              * se ho un id seriale e ho passato un id nell'oggetto da inserire lo elimino (nell'inserimento l'id sarà calcolato e non deve essere
              * considerato se passato).
              */
+            Object beforeUpdateEntity;
             if (EntityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
                 String pkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
                 LOGGER.warn(String.format("trovato campo %s con valore %s, lo elimino dai dati...", pkFieldName, data.get(pkFieldName)));
@@ -203,6 +204,7 @@ public abstract class RestControllerEngine {
                  * se esiste, JPA farà un update invece che un inserimento.
                  * Per cui mi salvo l'entità prima delle modifiche (che saranno effettuate successivamente con il metodo "merge" e setto inserting = false
                  */
+                
                 Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entity);
                 Object id = primaryKeyGetMethod.invoke(entity);
                 if (id != null) {
@@ -210,9 +212,10 @@ public abstract class RestControllerEngine {
                     if (foundEntity != null) {
                         inserting = false;
                         entity = foundEntity;
+                        beforeUpdateEntity = entity;
 //                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
                         // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
-                        beforeUpdateEntityApplier.setCurrentEntity(entity);
+//                        beforeUpdateEntityApplier.setCurrentEntity(entity);
                     }
                 }
             }
@@ -228,18 +231,18 @@ public abstract class RestControllerEngine {
              * per cui in caso di inserimento effettivo lancio l'intereptor beforeInsert, altrimenti l'interceptor beforeUpdate.
              */
             if (inserting) {
-                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executeBeforeCreateInterceptor(entity, request, additionalData, true, projectionClass);
             } else {
-                entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
             }
 
             // salvataggio dell'entità
             generalRepository.save(entity);
 
             if (inserting) {
-                entity = restControllerInterceptor.executeafterCreateInterceptor(entity, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executeAfterCreateInterceptor(entity, request, additionalData, true, projectionClass);
             } else {
-                entity = restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
+                entity = restControllerInterceptor.executeAfterUpdateInterceptor(entity, request, additionalData, true, projectionClass);
             }
 
             // Lancio gli interceptor after anche sulle entità correlate
@@ -335,7 +338,7 @@ public abstract class RestControllerEngine {
     public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException, AbortSaveInterceptorException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
-            launchedBeforeInterceptors = new ArrayList<ParameterizedInterceptor>();
+            launchedBeforeInterceptors = new ArrayList();
 
             Object entity = get(id, request, entityPath);
             if (entity == null) {
@@ -354,18 +357,19 @@ public abstract class RestControllerEngine {
             boolean willBeEntityModified = willBeEntityModified(entity, data);
 
             Object res = entity;
+            Object beforeUpdateEntity = entity;
             if (willBeEntityModified) {
-                beforeUpdateEntityApplier.setCurrentEntity(entity);
+//                beforeUpdateEntityApplier.setCurrentEntity(entity);
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
-                res = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
+                res = merge(data, entity, request, additionalData, new ArrayList(), projectionClass, null);
 
-                restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
+                restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
 
                 // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
-                restControllerInterceptor.executeafterUpdateInterceptor(entity, beforeUpdateEntityApplier, request, additionalData, true, projectionClass);
+                restControllerInterceptor.executeAfterUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 // Lancio gli interceptor after anche sulle entità correlate
                 restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
@@ -552,6 +556,9 @@ public abstract class RestControllerEngine {
      * @throws NoSuchMethodException
      */
     protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
+        
+//        Object currentEntity = beforeUpdateEntityApplier.getCurrentEntity();
+        
         // Aggiungo alla lista di metodi get il get attuale
         getMethodsPath.add(getMethod);
         Field field = EntityReflectionUtils.getDeclaredField(entityClass, key);
@@ -583,8 +590,9 @@ public abstract class RestControllerEngine {
         }
 
         boolean willBeEntityModified = willBeEntityModified(childEntity, value);
+        Object beforeUpdateEntity = childEntity;
         if (willBeEntityModified && !inserting) {
-            beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+//            beforeUpdateEntityApplier.setCurrentEntity(childEntity);
         }
         
 //        if (ancestorsFk == null) {
@@ -594,15 +602,17 @@ public abstract class RestControllerEngine {
         
         childEntity = merge(value, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass, ancestorsFk);
         if (inserting) {
-            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+            childEntity = restControllerInterceptor.executeBeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
             launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
-                    childEntity,request, additionalDataMap, false, projectionClass));
+                    childEntity, request, additionalDataMap, false, projectionClass));
         } else if (willBeEntityModified) {
-            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass);
+            childEntity = restControllerInterceptor.executeBeforeUpdateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
             launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
-                    childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass));
+                    childEntity, request, additionalDataMap, false, projectionClass));
         }
         setMethod.invoke(entity, childEntity);
+        
+//        beforeUpdateEntityApplier.setCurrentEntity(currentEntity);
     }
 
     /**
@@ -1010,6 +1020,8 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      */
     protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
+//        Object currentEntity = beforeUpdateEntityApplier.getCurrentEntity();
+        
         // Aggiungo alla lista di metodi get il metodo get attuale
         getMethodsPath.add(getMethod);
         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
@@ -1121,10 +1133,11 @@ public abstract class RestControllerEngine {
             }
 
             boolean willBeEntityModified = false;
+            Object beforeUpdateEntity = childEntity;
             if (!inserting) {
                 willBeEntityModified = willBeEntityModified(childEntity, childValue);
                 if (willBeEntityModified) {
-                    beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+//                    beforeUpdateEntityApplier.setCurrentEntity(childEntity);
                 }
             }
 
@@ -1135,14 +1148,14 @@ public abstract class RestControllerEngine {
 
             if (inserting) {
 
-                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+                childEntity = restControllerInterceptor.executeBeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
                 launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
                         childEntity,request, additionalDataMap, false, projectionClass));
 
             } else if (willBeEntityModified) {
-                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass);
+                childEntity = restControllerInterceptor.executeBeforeUpdateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
                 launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
-                        childEntity, beforeUpdateEntityApplier, request, additionalDataMap, false, projectionClass));
+                        childEntity, request, additionalDataMap, false, projectionClass));
             }
             // Rimuovo l'indice prima inserito (in modo che non compaia nella lista passata ad interceptor di altre entità di questa collection)
             getMethodsPath.remove(getMethodsPath.size()-1);
@@ -1182,6 +1195,7 @@ public abstract class RestControllerEngine {
         // infine svuoto la collection dell'entità e inserisco gli elementi passati
         entityElementsCollection.clear();
         entityElementsCollection.addAll(newElementCollection);
+//        beforeUpdateEntityApplier.setCurrentEntity(currentEntity);
     }
 
     /**

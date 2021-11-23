@@ -1,6 +1,5 @@
 package it.nextsw.common.interceptors;
 
-import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Map;
@@ -27,18 +26,18 @@ public final class ParameterizedInterceptor {
         this.parameters = params;
     }
 
-    public ParameterizedInterceptor(
-            NextSdrControllerInterceptor.InterceptorOperation operation,
-            NextSdrControllerInterceptor.InterceptorType type,
-            ArrayList<Object> getMethodsPaths,
-            Object entity,
-            BeforeUpdateEntityApplier beforeUpdateEntityApplier,
-            HttpServletRequest request, Map<String, String> additionalData,
-            boolean mainEntity,
-            Class projection) {
-        this(operation, type, new InterceptorParameters(entity, beforeUpdateEntityApplier, additionalData, request, mainEntity, projection));
-        this.setGetMethodsPaths(getMethodsPaths);
-    }
+//    public ParameterizedInterceptor(
+//            NextSdrControllerInterceptor.InterceptorOperation operation,
+//            NextSdrControllerInterceptor.InterceptorType type,
+//            ArrayList<Object> getMethodsPaths,
+//            Object entity,
+//            Object beforeUpdateEntity,
+//            HttpServletRequest request, Map<String, String> additionalData,
+//            boolean mainEntity,
+//            Class projection) {
+//        this(operation, type, new InterceptorParameters(entity, beforeUpdateEntity, additionalData, request, mainEntity, projection));
+//        this.setGetMethodsPaths(getMethodsPaths);
+//    }
 
     public ParameterizedInterceptor(
             NextSdrControllerInterceptor.InterceptorOperation operation,
@@ -84,7 +83,7 @@ public final class ParameterizedInterceptor {
     public void setGetMethodsPaths(ArrayList<Object> getMethodsPaths) {
         // In questo caso faccio una copia della collection per evitare il passaggio per referenza: non voglio che vengano
         // riflesse eventuali modifiche apportate alla lista ma voglio tenerla così come passata in questo momento.
-        this.getMethodsPaths = new ArrayList<Object>();
+        this.getMethodsPaths = new ArrayList();
         this.getMethodsPaths.addAll(getMethodsPaths);
     }
 }
