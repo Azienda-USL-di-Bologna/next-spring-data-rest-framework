@@ -509,30 +509,37 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         BooleanExpression res;
 
         StringOperation stringOperation = getStringOperation(valueToParse);
-
-        switch (stringOperation.getOperator()) {
-            case contains:
-                res = stringPath.contains(stringOperation.getValue());
-                break;
-            case containsIgnoreCase:
-                res = stringPath.containsIgnoreCase(stringOperation.getValue());
-                break;
-            case startsWith:
-                res = stringPath.startsWith(stringOperation.getValue());
-                break;
-            case startsWithIgnoreCase:
-                res = stringPath.startsWithIgnoreCase(stringOperation.getValue());
-                break;
-            case equals:
-                res = stringPath.eq(stringOperation.getValue());
-                break;
-            case equalsIgnoreCase:
-                res = stringPath.equalsIgnoreCase(stringOperation.getValue());
-                break;
-            default:
-                throw new InvalidFilterException(String.format("operatore %s non valido", stringOperation.getOperator()));
-
+      
+        if (stringOperation.getOperator().equals(StringOperation.Operators.equals)) {
+            res = stringPath.eq(stringOperation.getValue());
+        } else {
+            res = Expressions.booleanTemplate(
+                String.format("FUNCTION('like', {0}, %s, %s) = true",  stringOperation.getValue(), stringOperation.getOperator().toString()),
+                stringPath
+            );
         }
+//        switch (stringOperation.getOperator()) {
+//            case contains:
+//                res = stringPath.contains(stringOperation.getValue());
+//                break;
+//            case containsIgnoreCase:
+//                res = stringPath.containsIgnoreCase(stringOperation.getValue());
+//                break;
+//            case startsWith:
+//                res = stringPath.startsWith(stringOperation.getValue());
+//                break;
+//            case startsWithIgnoreCase:
+//                res = stringPath.startsWithIgnoreCase(stringOperation.getValue());
+//                break;
+//            case equals:
+//                res = stringPath.eq(stringOperation.getValue());
+//                break;
+//            case equalsIgnoreCase:
+//                res = stringPath.equalsIgnoreCase(stringOperation.getValue());
+//                break;
+//            default:
+//                throw new InvalidFilterException(String.format("operatore %s non valido", stringOperation.getOperator()));
+//        }
         return res;
     }
 
