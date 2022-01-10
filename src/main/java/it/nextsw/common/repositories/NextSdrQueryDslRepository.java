@@ -514,10 +514,15 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             res = stringPath.eq(stringOperation.getValue());
         } else {
             res = Expressions.booleanTemplate(
-                String.format("FUNCTION('like', {0}, %s, %s) = true",  stringOperation.getValue(), stringOperation.getOperator().toString()),
+                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue(), stringOperation.getOperator().toString()),
                 stringPath
             );
         }
+        /**
+         * TODO:
+         * Non cancellare il seguente codice in quanto il codice che usa la fuznione 'like' è specifico per postgres.
+         * Bisogna usare la parte di sotto se non si utilizza un dialetto custom ma questa cosa è da imp0lemntare.
+         */
 //        switch (stringOperation.getOperator()) {
 //            case contains:
 //                res = stringPath.contains(stringOperation.getValue());

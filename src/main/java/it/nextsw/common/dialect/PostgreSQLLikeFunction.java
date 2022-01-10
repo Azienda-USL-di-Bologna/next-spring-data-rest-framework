@@ -42,6 +42,9 @@ public class PostgreSQLLikeFunction implements SQLFunction {
         
         StringOperation.Operators operator = StringOperation.Operators.valueOf(operation);
         
+        // tolgo gli apici all'inizio e alla fine della stringa
+        value = value.substring(1, value.length() - 1);
+        
         switch (operator) {
             case contains:
                 value = "%" + value + "%"; 
