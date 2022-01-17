@@ -2,6 +2,8 @@ package it.nextsw.common.controller;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.hibernate.EmptyInterceptor;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +21,18 @@ public class HibernateEntityInterceptor extends EmptyInterceptor {
         
 //        System.out.println("ciao gdm non ti arrabbiare");
 //        System.out.println("sql: " + sql);
-        
+
+        // Mi occupo della fromula che richiede il distinct on
+        final String regexDistincOn = "(\\{PLACEHOLDER_DISTINCT_ON\\((.*)\\)\\})( as .*?_)";
+        Pattern MY_PATTERN = Pattern.compile(regexDistincOn);
+        Matcher matcher = MY_PATTERN.matcher(sql);
+        if (matcher.find()) {
+            String id = matcher.group(2);
+            sql = matcher.replaceFirst("null$3");
+            sql = sql.replaceFirst("select", "select distinct on (" + id + ")");
+        }
+
+        // Mi occupo delle formule per il ranking 
         Map<String, String> rankQueryMap = rankQueryObj.get();
         final String regex = "\\{[a-zA-Z]+\\.PLACEHOLDER_TS_RANK\\}";
         
