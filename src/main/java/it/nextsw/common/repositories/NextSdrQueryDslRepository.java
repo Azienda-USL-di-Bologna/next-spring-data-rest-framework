@@ -300,8 +300,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                 if (values.size() > 1) {
                                     for (int i = 1; i < strings.size(); i++) {
                                         booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
-                                                String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")),
-                                                path)));
+                                                String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")), path)));
                                         buildingRankQuery = buildingRankQuery + " " + ((String) strings.get(i));
                                     }
                                 }
@@ -514,7 +513,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             res = stringPath.eq(stringOperation.getValue());
         } else {
             res = Expressions.booleanTemplate(
-                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue(), stringOperation.getOperator().toString()),
+                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
                 stringPath
             );
         }
