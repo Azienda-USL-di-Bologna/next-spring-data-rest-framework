@@ -22,18 +22,19 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * @author gdm
  */
-public abstract class BaseCrudController extends RestControllerEngine {
+public abstract class BaseCrudController {
 
-    private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
+    private final Logger log = LoggerFactory.getLogger(BaseCrudController.class);
 
     @RequestMapping(value = {"*"}, method = {RequestMethod.POST, RequestMethod.PUT})
     @Transactional(rollbackFor = {Throwable.class})
     public ResponseEntity<?> insertResource(
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
+            @RequestParam(required = false) String projection,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
-        Object entity = super.insert(data, request, parseAdditionalDataIntoMap(additionalData), null, false);
+        Object entity = getRestControllerEngine().insert(data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
@@ -43,10 +44,11 @@ public abstract class BaseCrudController extends RestControllerEngine {
             @PathVariable(required = true) Object id,
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException {
+            @RequestParam(required = false) String projection,
+            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing update operation...");
         try {
-            Object update = super.update(id, data, request, parseAdditionalDataIntoMap(additionalData), null, false);
+            Object update = getRestControllerEngine().update(id, data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
             return new ResponseEntity(update, HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -58,12 +60,13 @@ public abstract class BaseCrudController extends RestControllerEngine {
     public ResponseEntity<?> deleteResource(
             @PathVariable(required = true) Object id,
             HttpServletRequest request,
+            @RequestParam(required = false) String projection,
             @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
         log.info("executing delete operation...");
 
         try {
-            super.delete(id, request, parseAdditionalDataIntoMap(additionalData), null, false);
+            getRestControllerEngine().delete(id, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
             return new ResponseEntity(HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -72,16 +75,23 @@ public abstract class BaseCrudController extends RestControllerEngine {
 
     @RequestMapping(value = {"batch"}, method = RequestMethod.POST)
     @Transactional(rollbackFor = {Throwable.class})
-    public void batchResources(
+    public ResponseEntity<?> batchResources(
             @RequestBody List<BatchOperation> data,
             HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
         try {
             log.info("executing batch operation...");
-            batch(data, request);
-//            return new ResponseEntity(HttpStatus.OK);
-        }
-        catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
+            Object batch = getRestControllerEngine().batch(data, request);
+            return new ResponseEntity(batch, HttpStatus.OK);
+        } catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
             throw ex;
         }
     }
+
+    /**
+     * Ritorna un'istanza di {@link RestControllerEngine} che verrà utilizzato
+     * dai metodi per la modifica dell'entità di questo controller
+     *
+     * @return
+     */
+    public abstract RestControllerEngine getRestControllerEngine();
 }

@@ -12,6 +12,7 @@ import javax.persistence.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -20,47 +21,62 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- *
- * @author gdm
+ * Classe di utilità di reflection per Entità
  */
-@Component
 public class EntityReflectionUtils {
 
-    public Method getPrimaryKeySetMethod(Object entity) throws NoSuchMethodException {
+    public static Method getPrimaryKeySetMethod(Object entity) throws NoSuchMethodException {
         return getPrimaryKeySetMethod(entity.getClass());
     }
 
-    public Method getPrimaryKeySetMethod(Class entityClass) throws NoSuchMethodException {
+    public static Method getPrimaryKeySetMethod(Class entityClass) throws NoSuchMethodException {
         Field primaryKeyField = getPrimaryKeyField(entityClass);
         Class fieldType = primaryKeyField.getType();
         return entityClass.getMethod("set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, primaryKeyField.getName()), fieldType);
     }
     
-    public boolean hasSerialPrimaryKey(Class entityClass) throws NoSuchMethodException {
+    public static boolean hasSerialPrimaryKey(Class entityClass) throws NoSuchMethodException {
         Field primaryKeyField = getPrimaryKeyField(entityClass);
         GeneratedValue generatedValueAnnotation = primaryKeyField.getAnnotation(GeneratedValue.class);
         return generatedValueAnnotation != null;
     }
 
-    public Method getPrimaryKeyGetMethod(Object entity) throws NoSuchMethodException {
+    public static Method getPrimaryKeyGetMethod(Object entity) throws NoSuchMethodException {
         return getPrimaryKeyGetMethod(entity.getClass());
     }
 
-    public Method getPrimaryKeyGetMethod(Class entityClass) throws NoSuchMethodException {
+    public static Method getPrimaryKeyGetMethod(Class entityClass) throws NoSuchMethodException {
         Field primaryKeyField = getPrimaryKeyField(entityClass);
-        return entityClass.getMethod("get" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, primaryKeyField.getName()));
+        return getGetMethod(entityClass,primaryKeyField.getName());
     }
 
-    public Field getPrimaryKeyField(Class entityClass) {
-        List<Field> declaredFields = new ArrayList(Arrays.asList(entityClass.getDeclaredFields()));
-        Class superclass = entityClass.getSuperclass();
+    public static Field getPrimaryKeyField(Class entityClass) {
+        return getFieldFromAnnotation(entityClass, Id.class);
+    }
+    
+    public static Object getPrimaryKeyValue(Object entity) throws NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        Method primaryKeyGetMethod = getPrimaryKeyGetMethod(entity);
+        return primaryKeyGetMethod.invoke(entity);
+    }
+    
+    public static Field getVersionField(Class entityClass) {
+        return getFieldFromAnnotation(entityClass, Version.class);
+    }
+    
+    public static Field getFieldFromAnnotation(Class classz, Class annotationClass) {
+        if (!annotationClass.isAnnotation()) {
+            throw new RuntimeException(String.format("annotationClass deve essere un'annotazione"));
+        }
+        
+        List<Field> declaredFields = new ArrayList(Arrays.asList(classz.getDeclaredFields()));
+        Class superclass = classz.getSuperclass();
         while (superclass != null) {
             declaredFields.addAll(new ArrayList(Arrays.asList(superclass.getDeclaredFields())));
             superclass = superclass.getSuperclass();
         }
         Field res = null;
         for (Field declaredField : declaredFields) {
-            if (declaredField.getAnnotation(Id.class) != null) {
+            if (declaredField.getAnnotation(annotationClass) != null) {
                 res = declaredField;
                 break;
             }
@@ -75,13 +91,13 @@ public class EntityReflectionUtils {
                 || field.getAnnotation(ManyToMany.class) != null;
     }
 
-    public boolean isRepositoryClass(Class classz) {
+    public static boolean isRepositoryClass(Class classz) {
         java.lang.annotation.Annotation annotation = classz.getAnnotation(RepositoryRestResource.class);
         //System.out.println(annotation);
         return annotation != null;
     }
 
-    public boolean isEntityClassFromProxyObject(Class classz) {
+    public static boolean isEntityClassFromProxyObject(Class classz) {
         java.lang.annotation.Annotation annotation = null;
         Class superclass = classz;
         while (superclass != null && annotation == null) {
@@ -91,9 +107,19 @@ public class EntityReflectionUtils {
         return annotation != null;
     }
 
-    public boolean isEntityClass(Class classz) {
+    public static boolean isEntityClass(Class classz) {
         java.lang.annotation.Annotation annotation = classz.getAnnotation(javax.persistence.Entity.class);
         return annotation != null;
+    }
+    
+    public static boolean isColumnOrVersionOrFkField(Field field) {
+        java.lang.annotation.Annotation columnAnnotation = field.getAnnotation(Column.class);
+        return columnAnnotation != null || isVersionField(field) || EntityReflectionUtils.isForeignKeyField(field);
+    }
+    
+    public static boolean isVersionField(Field field) {
+        java.lang.annotation.Annotation versionAnnotation = field.getAnnotation(Version.class);
+        return versionAnnotation != null;
     }
 
     /**
@@ -102,11 +128,11 @@ public class EntityReflectionUtils {
      * classe Entity
      *
      * @param proxyEntity
-     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * @return la classe entities vero e proprio a partire dalle classi proxy
      * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
-    public Class getEntityFromProxyObject(Object proxyEntity) throws EntityReflectionException {
+    public static Class getEntityFromProxyObject(Object proxyEntity) throws EntityReflectionException {
         return getEntityFromProxyClass(proxyEntity.getClass());
     }
 
@@ -116,12 +142,12 @@ public class EntityReflectionUtils {
      * classe Entity
      *
      * @param proxyEntityClass
-     * @return la classe entity vero e proprio a partire dalle classi proxy
+     * @return la classe entities vero e proprio a partire dalle classi proxy
      * generate da Spring
      * @throws it.nextsw.common.utils.exceptions.EntityReflectionException
      */
 
-    public Class getEntityFromProxyClass(Class<?> proxyEntityClass) throws EntityReflectionException {
+    public static Class getEntityFromProxyClass(Class<?> proxyEntityClass) throws EntityReflectionException {
         Class<?> classz = proxyEntityClass;
         do {
             if (isEntityClass(classz)) {
@@ -138,7 +164,7 @@ public class EntityReflectionUtils {
      * @return
      * @throws EntityReflectionException
      */
-    public Class getDefaultProjection(Object repository) throws EntityReflectionException {
+    public static Class getDefaultProjection(Object repository) throws EntityReflectionException {
         Class classz = repository.getClass();
         NextSdrRepository nextSdrRepository = null;
         try {
@@ -192,16 +218,16 @@ public class EntityReflectionUtils {
         return null;
     }
     
-    public String getFilterFieldName(Field field, Class targetEntityClass) {
+    public static String getFilterFieldName(Field field, Class targetEntityClass) {
         String filterFieldName = null;
 
         // se l'annotazione è OneToMany allora il filterFieldName si ottiene dal mappedBy
-        OneToMany oneToManyAnnotation = field.getAnnotationsByType(OneToMany.class)[0];
+        OneToMany oneToManyAnnotation = Arrays.stream(field.getAnnotationsByType(OneToMany.class)).findFirst().orElse(null);
         if (oneToManyAnnotation != null) {
             filterFieldName = oneToManyAnnotation.mappedBy();
         } else {
             // se l'annotazione è ManyToMany ci sono 2 casi, se c'è il mappedBy, allora il filterFieldName si ottiene da esso
-            ManyToMany manyToManyAnnotation = field.getAnnotationsByType(ManyToMany.class)[0];
+            ManyToMany manyToManyAnnotation = Arrays.stream(field.getAnnotationsByType(ManyToMany.class)).findFirst().orElse(null);
             if (manyToManyAnnotation != null) {
                 if (manyToManyAnnotation.mappedBy() != null && !manyToManyAnnotation.mappedBy().isEmpty()) {
                     filterFieldName = manyToManyAnnotation.mappedBy();
@@ -213,10 +239,11 @@ public class EntityReflectionUtils {
                  *
                  */
                 else {
-                    Field[] TargetClassFields = targetEntityClass.getDeclaredFields();
-                    for (Field targetField : TargetClassFields) {
-                        ManyToMany annotation = targetField.getAnnotationsByType(ManyToMany.class)[0];
-                        if (annotation.mappedBy().equals(field.getName())) {
+                    Field[] targetClassFields = targetEntityClass.getDeclaredFields();
+                    for (Field targetField : targetClassFields) {
+                        ManyToMany annotation = Arrays.stream(targetField.getAnnotationsByType(ManyToMany.class)).findFirst().orElse(null);
+                        if (annotation != null && annotation.mappedBy()!= null &&
+                                annotation.mappedBy().equals(field.getName())) {
                             filterFieldName = targetField.getName();
                             break;
                         }
@@ -233,7 +260,7 @@ public class EntityReflectionUtils {
      * @param entityField il campo FK dell'entità
      * @return 
      */
-    public boolean hasOrphanRemoval(Field entityField) {
+    public static boolean hasOrphanRemoval(Field entityField) {
         try {
             OneToMany oneToManyAnnotation = entityField.getAnnotation(javax.persistence.OneToMany.class);
             if (oneToManyAnnotation != null)
@@ -280,7 +307,7 @@ public class EntityReflectionUtils {
      * @return
      */
     public static Method getSetMethod(Class entityClass, String fieldName)  {
-        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName),null);
+        Method result = ReflectionUtils.findMethod(entityClass, "set" + CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, fieldName), null);
         if (result != null)
             return result;
         else

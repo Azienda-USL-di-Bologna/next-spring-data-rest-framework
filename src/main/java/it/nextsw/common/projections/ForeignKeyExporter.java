@@ -1,11 +1,11 @@
 package it.nextsw.common.projections;
 
 import com.google.common.base.CaseFormat;
-import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.annotations.NextSdrRepository;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
+import it.nextsw.common.utils.ForeignKey;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.env.Environment;
 
 /**
  *
@@ -30,9 +29,6 @@ import org.springframework.core.env.Environment;
  */
 @Component
 public class ForeignKeyExporter {
-
-    @Autowired
-    EntityReflectionUtils entityReflectionUtils;
 
     @Autowired
     CommonUtils commonUtils;
@@ -48,13 +44,14 @@ public class ForeignKeyExporter {
         HttpServletRequest currentRequest
                 = ((ServletRequestAttributes) RequestContextHolder.
                         currentRequestAttributes()).getRequest();
-
+        String url = null;
         NextSdrQueryDslRepository targetEntityRepository = customRepositoryEntityMap.get(targetEntityClass.getCanonicalName());
-        NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
-
-        String baseUrl = commonUtils.resolvePlaceHolder(annotation.baseUrl());
-        String hostName = commonUtils.getHostname(currentRequest);
-        String url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + baseUrl + "/" + annotation.repositoryPath();
+        if (targetEntityRepository != null) {
+            NextSdrRepository annotation = EntityReflectionUtils.getFirstAnnotationOverHierarchy(targetEntityRepository.getClass(), NextSdrRepository.class);
+            String path = commonUtils.resolvePlaceHolder(annotation.repositoryPath());
+            String hostName = commonUtils.getHostname(currentRequest);
+            url = currentRequest.getScheme() + "://" + hostName + ":" + currentRequest.getServerPort() + path;
+        }
 
         return url;
     }
@@ -65,7 +62,7 @@ public class ForeignKeyExporter {
         String fullUrl = null;
 
         // esempio idAzienda
-        Field field = entityReflectionUtils.getEntityFromProxyObject(SourceEntity).getDeclaredField(fieldName);
+        Field field = EntityReflectionUtils.getEntityFromProxyObject(SourceEntity).getDeclaredField(fieldName);
 //        Field field = SourceEntity.getClass().getDeclaredField(fieldName);
 
         /**
@@ -91,13 +88,18 @@ public class ForeignKeyExporter {
                  * il nuovo URL deve avere idAzienda.id=5, quindi generare il
                  * link
                  */
-                String filterFieldName = entityReflectionUtils.getFilterFieldName(field, targetEntityClass);
+                String filterFieldName = EntityReflectionUtils.getFilterFieldName(field, targetEntityClass);
 
-                Field primaryKeyField = entityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
-                Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
-                id = primaryKeyGetMethod.invoke(SourceEntity);
-                targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
-                fullUrl = String.format("%s?%s.%s=%s", buildUrl(targetEntityClass), filterFieldName, primaryKeyField.getName(), id);
+                if (filterFieldName != null) {
+                    Field primaryKeyField = EntityReflectionUtils.getPrimaryKeyField(SourceEntity.getClass());
+                    Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(SourceEntity);
+                    id = primaryKeyGetMethod.invoke(SourceEntity);
+                    targetEntityName = targetEntityClass.getSimpleName().toLowerCase();
+                    String buildedUrl = buildUrl(targetEntityClass);
+                    if (buildedUrl != null) {
+                        fullUrl = String.format("%s?%s.%s=%s", buildedUrl, filterFieldName, primaryKeyField.getName(), id);
+                    }
+                }
 //                String url = buildBaseUrl(targetEntityName) + "?" + filterFieldName + ".id=" + id.toString();
             } else {
                 throw new ServletException("Le collection vanno dichiarate tipizzate");
@@ -110,7 +112,7 @@ public class ForeignKeyExporter {
             Class entityClass = getFkMethod.getReturnType();
 //            Class trueEntityClass = entityReflectionUtils.getEntityFromProxyObject(fkEntity);
             // dal tipo di ritorno si va a prendere la getPrimaryKey
-            Method fkPrimaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(entityClass);
+            Method fkPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entityClass);
 
             // qui nell'esempio con l'azienda sarà Azienda
             targetEntityName = entityClass.getSimpleName().toLowerCase();

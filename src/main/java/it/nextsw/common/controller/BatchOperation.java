@@ -12,16 +12,18 @@ public class BatchOperation {
     private Operations operation;
     private Object id;
     private String entityPath;
-    private Map<String, Object> entityBody;
+    private String returnProjection;
+    private Object entityBody;
     private Map<String, String> additionalData;
 
     public BatchOperation() {
     }
 
-    public BatchOperation(Operations operation, Object id, String entityPath, Map<String, Object> entityBody, Map<String, String> additionalData) {
+    public BatchOperation(Operations operation, Object id, String entityPath, String returnProjection, Map<String, Object> entityBody, Map<String, String> additionalData) {
         this.operation = operation;
         this.id = id;
         this.entityPath = entityPath;
+        this.returnProjection = returnProjection;
         this.entityBody = entityBody;
         this.additionalData = additionalData;
     }
@@ -52,11 +54,19 @@ public class BatchOperation {
         this.entityPath = entityPath;
     }
 
-    public Map<String, Object> getEntityBody() {
+    public String getReturnProjection() {
+        return returnProjection;
+    }
+
+    public void setReturnProjection(String returnProjection) {
+        this.returnProjection = returnProjection;
+    }
+
+    public Object getEntityBody() {
         return entityBody;
     }
 
-    public void setEntityBody(Map<String, Object> entityBody) {
+    public void setEntityBody(Object entityBody) {
         this.entityBody = entityBody;
     }
 

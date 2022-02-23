@@ -45,7 +45,7 @@ public class NextSdrRepositoriesConfiguration {
                         repository.getClass().getName(), NextSdrQueryDslRepository.class.getName()));
             }
 //            repositories.put(nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
-            repositories.put(commonUtils.resolvePlaceHolder(nextSdrRepositoryAnnotation.baseUrl()) + "/" + nextSdrRepositoryAnnotation.repositoryPath(), (NextSdrQueryDslRepository) repository);
+            repositories.put(commonUtils.resolvePlaceHolder(nextSdrRepositoryAnnotation.repositoryPath()), (NextSdrQueryDslRepository) repository);
         }
         return repositories;
     }

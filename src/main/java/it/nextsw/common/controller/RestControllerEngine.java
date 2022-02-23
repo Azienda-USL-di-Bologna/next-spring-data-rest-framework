@@ -1,8 +1,11 @@
 package it.nextsw.common.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import it.nextsw.common.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
+import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
+import it.nextsw.common.interceptors.ParameterizedInterceptor;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Splitter;
@@ -10,16 +13,20 @@ import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.EntityPathBase;
 import com.querydsl.core.types.dsl.PathBuilder;
+import it.nextsw.common.annotations.NextSdrAncestor;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
+import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
+import it.nextsw.common.utils.ForeignKey;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
-import it.bologna.ausl.jenesisprojections.tools.ForeignKey;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
 import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import it.nextsw.common.projections.ProjectionsInterceptorLauncher;
+import it.nextsw.common.spring.resolver.NextSdrPageable;
+import it.nextsw.common.spring.resolver.OffsetLimitPageRequest;
 
 import java.io.IOException;
 
@@ -31,16 +38,18 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import javax.persistence.EntityManager;
+import javax.persistence.OneToOne;
+import javax.persistence.OptimisticLockException;
 import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +61,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.web.PagedResourcesAssembler;
-import org.springframework.hateoas.ResourceAssembler;
+import org.springframework.hateoas.server.RepresentationModelAssembler;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
@@ -63,13 +73,7 @@ import org.springframework.util.StringUtils;
  */
 public abstract class RestControllerEngine {
 
-    private final Logger log = LoggerFactory.getLogger(RestControllerEngine.class);
-
-    @Autowired
-    protected EntityReflectionUtils entityReflectionUtils;
-
-    @Autowired
-    private RestControllerInterceptorEngine restControllerInterceptor;
+    private final Logger LOGGER = LoggerFactory.getLogger(RestControllerEngine.class);
 
     @Autowired
     protected ProjectionFactory factory;
@@ -78,16 +82,19 @@ public abstract class RestControllerEngine {
     protected PagedResourcesAssembler<Object> assembler;
 
     @Autowired
-    protected ResourceAssembler resourceAssembler;
+    protected RepresentationModelAssembler resourceAssembler;
 
     @Autowired
     protected ObjectMapper objectMapper;
+
+    @Autowired
+    protected CommonUtils commonUtils;
 
     @PersistenceContext
     protected EntityManager em;
 
     @Autowired
-    ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
+    protected ProjectionsInterceptorLauncher projectionsInterceptorLauncher;
 
     /**
      * mappa dei repository in cui la chiave è il path completo (baseUrl + "/" + repositoryPath, es. /resources/baborg-api/azienda)
@@ -102,9 +109,20 @@ public abstract class RestControllerEngine {
     @Autowired
     @Qualifier(value = "projectionsMap")
     protected Map<String, Class> projectionsMap;
+    
+//    @Autowired
+//    protected BeforeUpdateEntityApplier beforeUpdateEntityApplier;
 
+    // Lista in cui vengono salvati tutti gli interceptor di tipo BeforeCreate, BeforeUpdate e BeforeDelete che si tenta di lanciare
+    // durante le varie procedure di aggiornamento; verrà valutata dopo il salvataggio dell'entità per richiamare eventuali
+    // interceptor di tipo AfterCreate, AfterUpdate e AfterDelete
+    private List<ParameterizedInterceptor> launchedBeforeInterceptors = new ArrayList();
+
+    @Autowired
+    private RestControllerInterceptorEngine restControllerInterceptor;
+    
     /**
-     * metodo che restituisce, se esiste, l'entity richiesta prendendola dal
+     * metodo che restituisce, se esiste, l'entities richiesta prendendola dal
      * repository
      *
      * @param id
@@ -124,7 +142,7 @@ public abstract class RestControllerEngine {
             }
 
             Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
-            Class<?> pkType = entityReflectionUtils.getPrimaryKeyField(entityClass).getType();
+            Class<?> pkType = EntityReflectionUtils.getPrimaryKeyField(entityClass).getType();
 
             Optional<Object> entity = generalRepository.findById(objectMapper.convertValue(id, pkType));
             if (entity.isPresent()) {
@@ -137,19 +155,21 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Inserimento di una nuova entity
+     * Inserimento di una nuova entities
      *
      * @param data           - dati grezzi passati nella richiesta
      * @param request
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
-     * @return l'entità inserita, con la projection base applicata
+     * @param projection     la projection da applicare al dato ritnorato
+     * @return l'entità inserita, con la projection passata applicata. Se non passata viene applicata quella base
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    protected Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException {
+    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
+        launchedBeforeInterceptors = new ArrayList<>();
 
         // istanziazione del repository corretto
         JpaRepository generalRepository;
@@ -158,24 +178,25 @@ public abstract class RestControllerEngine {
         } else {
             generalRepository = (JpaRepository) getGeneralRepository(request, false);
         }
+
         Class entityClass = EntityReflectionUtils.getEntityClassFromRepository(generalRepository);
         try {
+
+            Class projectionClass = getProjectionClass(projection, generalRepository);
             /*
              * istanzio un'entità vuota, che sarà poi "riempita" dal metodo merge più avanti
              */
             Object entity = entityClass.newInstance();
             boolean inserting = true;
 
-            // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
-            Object beforeUpdateEntity = null;
-
             /*
              * se ho un id seriale e ho passato un id nell'oggetto da inserire lo elimino (nell'inserimento l'id sarà calcolato e non deve essere
              * considerato se passato).
              */
-            if (entityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
-                String pkFieldName = entityReflectionUtils.getPrimaryKeyField(entityClass).getName();
-                log.warn(String.format("trovato campo %s con valore %s, lo elimino dai dati...", pkFieldName, data.get(pkFieldName)));
+            Object beforeUpdateEntity;
+            if (EntityReflectionUtils.hasSerialPrimaryKey(entityClass)) {
+                String pkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
+                LOGGER.warn(String.format("trovato campo %s con valore %s, lo elimino dai dati...", pkFieldName, data.get(pkFieldName)));
                 data.remove(pkFieldName);
             } else {
                 /*
@@ -183,15 +204,18 @@ public abstract class RestControllerEngine {
                  * se esiste, JPA farà un update invece che un inserimento.
                  * Per cui mi salvo l'entità prima delle modifiche (che saranno effettuate successivamente con il metodo "merge" e setto inserting = false
                  */
-                Method primaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(entity);
+                
+                Method primaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(entity);
                 Object id = primaryKeyGetMethod.invoke(entity);
                 if (id != null) {
-                    Object foundEntity = em.find(entityClass, id);
+                    Object foundEntity = retriveEntity(entityClass, id);
                     if (foundEntity != null) {
                         inserting = false;
                         entity = foundEntity;
-//                        beforeUpdateEntity = objectMapper.convertValue(entity, entityClass);
-                        beforeUpdateEntity = cloneEntity(entity);
+                        beforeUpdateEntity = entity;
+//                        beforeUpdateEntity = objectMapper.convertValue(entities, entityClass);
+                        // mi servirà solo nel caso ho passato nei dati dell'entità da inserire un id ed esiste un entità con pk non seriale con quell'id (in questo caso sarà fatto un upadte)
+//                        beforeUpdateEntityApplier.setCurrentEntity(entity);
                     }
                 }
             }
@@ -199,7 +223,7 @@ public abstract class RestControllerEngine {
             /*
              * Il metodo merge setta i valori passati sull'entità ricorsivamente, inolte lancia i giusti interceptor sui figli.
              */
-            entity = merge(data, entity, request, additionalData);
+            entity = merge(data, entity, request, additionalData, new ArrayList<Object>(), projectionClass, null);
 
             /*
              * interceptor su entità padre (gli interceptor su entità figlie sono già state fatte prima).
@@ -207,13 +231,22 @@ public abstract class RestControllerEngine {
              * per cui in caso di inserimento effettivo lancio l'intereptor beforeInsert, altrimenti l'interceptor beforeUpdate.
              */
             if (inserting) {
-                entity = restControllerInterceptor.executebeforeCreateInterceptor(entity, request, additionalData);
+                entity = restControllerInterceptor.executeBeforeCreateInterceptor(entity, request, additionalData, true, projectionClass);
             } else {
-                entity = restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
+                entity = restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
             }
 
             // salvataggio dell'entità
             generalRepository.save(entity);
+
+            if (inserting) {
+                entity = restControllerInterceptor.executeAfterCreateInterceptor(entity, request, additionalData, true, projectionClass);
+            } else {
+                entity = restControllerInterceptor.executeAfterUpdateInterceptor(entity, request, additionalData, true, projectionClass);
+            }
+
+            // Lancio gli interceptor after anche sulle entità correlate
+            restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
 
             /*
              * viene ritornata l'entità inserita con tutti i campi, compreso l'id generato, con la projection base applicata,
@@ -221,7 +254,6 @@ public abstract class RestControllerEngine {
              */
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
-                Class projectionClass = getProjectionClass(null, generalRepository);
                 entity = factory.createProjection(projectionClass, entity);
             }
             return entity;
@@ -230,21 +262,31 @@ public abstract class RestControllerEngine {
         }
     }
 
+    
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+        delete(id, request, additionalData, entityPath, batch, projection, null);
+    }
+    
     /**
-     * Cancellazione di un'entity
+     * Cancellazione di un'entities
      *
      * @param id             - id dell'entità da eliminare
      * @param request
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
+     * @param projection  
+     * @param repository     se si conosce il repository lo si può passare direttamente
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public void delete(Object id, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection, JpaRepository repository) throws RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+        launchedBeforeInterceptors = new ArrayList();
         JpaRepository generalRepository;
-        if (StringUtils.hasText(entityPath)) {
+        if (repository != null) {
+            generalRepository = repository;
+        } else if (StringUtils.hasText(entityPath)) {
             generalRepository = (JpaRepository) customRepositoryPathMap.get(entityPath);
         } else {
             generalRepository = (JpaRepository) getGeneralRepository(request, true);
@@ -257,17 +299,29 @@ public abstract class RestControllerEngine {
 
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         try {
-            launchNestedBefereDeleteInterceptor(entity, request, additionalData);
+            Class projectionClass = getProjectionClass(projection, generalRepository);
+
+            restControllerInterceptor.launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE, true, projectionClass);
             generalRepository.delete(entity);
-        } catch (ClassNotFoundException | EntityReflectionException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+            restControllerInterceptor.launchNestedDeleteInterceptor(entity, request, additionalData, new HashMap(), NextSdrControllerInterceptor.InterceptorType.AFTER, true, projectionClass);
+
+            // Lancio gli interceptor after anche sulle entità correlate
+            restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
+        } catch (ClassNotFoundException | 
+                EntityReflectionException | 
+                IllegalAccessException | 
+                IllegalArgumentException | 
+                InvocationTargetException | 
+                NoSuchMethodException
+                ex) {
             throw new RestControllerEngineException("errore nel delete", ex);
         } catch (SkipDeleteInterceptorException ex) {
-            log.info("eliminazione annullata dall'interceptor", ex);
+            LOGGER.info("eliminazione annullata dall'interceptor", ex);
         }
     }
 
     /**
-     * Aggiornamento di un'entity esistente
+     * Aggiornamento di un'entities esistente
      *
      * @param id
      * @param data
@@ -275,24 +329,21 @@ public abstract class RestControllerEngine {
      * @param additionalData
      * @param entityPath     opzionale(serve per le operazione batch), se passata viene usata per reperire il repository, altrimenti il repository viene reperito analizzando la request
      * @param batch          passare true se è la fuunziona viene richiamata in una operazione batch
-     * @return
+     * @param projection     projection da applicare all'entità tornata dopo l'update
+     * @return               l'entità modificata con la projection passata applicata. Se non passata viene applicata quella base
      * @throws RestControllerEngineException
-     * @throws it.nextsw.common.controller.exceptions.NotFoundResourceException
+     * @throws NotFoundResourceException
+     * @throws AbortSaveInterceptorException
      */
-    protected Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch) throws RestControllerEngineException, NotFoundResourceException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException, AbortSaveInterceptorException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
+            launchedBeforeInterceptors = new ArrayList();
 
             Object entity = get(id, request, entityPath);
             if (entity == null) {
                 throw new NotFoundResourceException(String.format("la risorsa con id %s non è stata trovata", id.toString()));
             }
-
-//            Object beforeUpdateEntity = objectMapper.convertValue(entity, entityReflectionUtils.getEntityFromProxyObject(entity));
-            Object beforeUpdateEntity = cloneEntity(entity);
-
-            // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
-            Object res = merge(data, entity, request, additionalData);
 
             JpaRepository generalRepository;
             if (StringUtils.hasText(entityPath)) {
@@ -301,16 +352,34 @@ public abstract class RestControllerEngine {
                 generalRepository = (JpaRepository) getGeneralRepository(request, true);
             }
 
-            restControllerInterceptor.executebeforeUpdateInterceptor(entity, beforeUpdateEntity, request, additionalData);
+            Class projectionClass = getProjectionClass(projection, generalRepository);
 
-            generalRepository.save(res);
+            boolean willBeEntityModified = willBeEntityModified(entity, data);
+
+            Object res = entity;
+            Object beforeUpdateEntity = entity;
+            if (willBeEntityModified) {
+//                beforeUpdateEntityApplier.setCurrentEntity(entity);
+
+                // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
+                res = merge(data, entity, request, additionalData, new ArrayList(), projectionClass, null);
+
+                restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
+
+                generalRepository.save(res);
+
+                // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
+                restControllerInterceptor.executeAfterUpdateInterceptor(entity, request, additionalData, true, projectionClass);
+
+                // Lancio gli interceptor after anche sulle entità correlate
+                restControllerInterceptor.launchAfterInterceptorsOnChildEntities(entity, launchedBeforeInterceptors);
+            }
             /*
              * viene ritornata l'entità inserita con tutti i campi, compreso l'id generato, con la projection base applicata,
              * ma nel caso di batch non applico la projection
              */
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
-                Class projectionClass = getProjectionClass(null, generalRepository);
                 res = factory.createProjection(projectionClass, res);
             }
 
@@ -321,12 +390,14 @@ public abstract class RestControllerEngine {
     }
 
     /**
-     * Setta i valori presenti nella mappa "data" sull'entità preservando gli altri. Scende ricorsivamenti su tutti i figli e lancia i giusti interceptor
+     * Setta i valori presenti nella mappa "data" sull'entità preservando gli altri.Scende ricorsivamenti su tutti i figli e lancia i giusti interceptor
      *
      * @param data              la mappa dei valori da settare
      * @param entity            l'entità sulla quale settare i valori
      * @param request           la request
      * @param additionalDataMap la mappa degli additiol data passati nella rechiesta
+     * @param getMethodPaths lista di metodi get da richiamare sull'entità principale per recuperare l'entità discendente su cui sto lavorando
+     * @param projectionClass
      * @return l'oggetto modificato
      * @throws RestControllerEngineException
      * @throws IllegalAccessException
@@ -341,42 +412,64 @@ public abstract class RestControllerEngine {
      * @throws InstantiationException
      * @throws NoSuchMethodException
      */
-    protected Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap) throws Exception {
-        Class entityClass = entityReflectionUtils.getEntityFromProxyObject(entity);
-        String entityPkFieldName = entityReflectionUtils.getPrimaryKeyField(entityClass).getName();
-        boolean hasSerialPrimaryKey = entityReflectionUtils.hasSerialPrimaryKey(entityClass);
+    protected Object merge(Map<String, Object> data, Object entity, HttpServletRequest request, Map<String, String> additionalDataMap, ArrayList<Object> getMethodPaths, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
+
+        Class entityClass = EntityReflectionUtils.getEntityFromProxyObject(entity);
+        String entityPkFieldName = EntityReflectionUtils.getPrimaryKeyField(entityClass).getName();
+        
+        // se sull'entità è presente un campo con l'annotazione Version, fa il controllo delle versione tramite optimistic lock
+        checkVersion(entity, entityClass, entityPkFieldName, data);
+        
+        boolean hasSerialPrimaryKey = EntityReflectionUtils.hasSerialPrimaryKey(entityClass);
+        
+        if (ancestorsFk != null && !ancestorsFk.isEmpty()) {
+            manageAncestorsMege(entity, entityClass, ancestorsFk, data);
+        }
+
         for (String key : data.keySet()) {
 
             Object value = data.get(key);
             /*
-             * se sono stati passati dei campi ForeignKey (cioè che iniziano con
-             * la stringa "fk_") vuol dire che non si deve inserire l'entità di
-             * foreign key, ma usarne una già esistente
+             * se l'entità ha una pk seriale, devo saltare il settaggio dell'id perché:
+             * se sono nel caso di insert deve rimanere null per cui se l'ho passato non lo devo settare altrimenti avrei un errore
+             * se sono nel caso di update l'entità in input di questa funzione lo ha già settato e se lo cambiassi avrei un errore
              */
-            if (key.startsWith("fk_")) {
-                manageFkMerge(entity, entityClass, key, value);
-            } else {
-                /*
-                 * se 'entità ha una pk seriale, devo saltare il settaggio dell'id perché:
-                 * se sono nel caso di insert deve rimanere null per cui se l'ho passato non lo devo settare altrimenti avrei un errore
-                 * se sono nel caso di update l'entità in input di questa funzione lo ha già settato e se lo cambiassi avrei un errore
-                 */
-                if (!hasSerialPrimaryKey || !entityPkFieldName.equals(key)) {
-                    Method setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
-                    Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+            if (!hasSerialPrimaryKey || !entityPkFieldName.equals(key)) {
+                Method setMethod = null;
+                Method getMethod = null;
+                Field field = null;
+                try {
+                    field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+                    setMethod = EntityReflectionUtils.getSetMethod(entity.getClass(), key);
+                    getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+                } catch (Exception ex) {
+                }
+                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
                     if (value != null) {
-                        if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class)) {
+                        if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class) || setMethod.getParameterTypes()[0].isAssignableFrom(ZonedDateTime.class)) {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
+                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb") || 
+                                    ((org.hibernate.annotations.Type)field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json")
+                                )
+                        ) {
+                            manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
-                            manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod);
-
-                        } else if (EntityReflectionUtils.isForeignKeyField(EntityReflectionUtils.getDeclaredField(entityClass, key))) {
-                            manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod);
+                            // TODO: QUesto else if deve assicurarsi di escludere i field json/jsonb. Per il momento è stato messo l'esleif del jsonb sopra a questo.
+                            manageCollectionMerge(entity, entityClass, key, (Collection) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths), projectionClass, ancestorsFk);
+                        } else if (EntityReflectionUtils.isForeignKeyField(field)) {
+                            /*
+                             * caso in cui l'elemento è un'entità singola,
+                             * richiamo ricorsivamente il merge sull'oggetto.
+                             */
+                            manageChildEntityMerge(entity, entityClass, key, (Map<String, Object>) value, request, additionalDataMap, setMethod, getMethod, commonUtils.getNewInstanceOfCollection(getMethodPaths) , projectionClass, ancestorsFk);
                         } else if (Enum.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageEnumMerge(entity, value, setMethod);
-                        } else {
+                        } else if (Number.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
+                            manageNumericMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
+                        }  else {
                             /*
                              * tutti gli altri casi, cioè l'elemento è un tipo
                              * base (String o Integer, o forse qualche altro
@@ -394,56 +487,50 @@ public abstract class RestControllerEngine {
         return entity;
     }
 
-
     /**
-     * Gestisce la merge nel caso in cui il campo sia null.
-     * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
-     *
-     * @param entity
+     * Se sull'entità è presente l'annotazione Version controlla che in "data" sia presente il campo "version":
+     *  se non c'è lancia eccezione;
+     *  se c'è e il valore è diverso da quello sull'entità lancia eccezione;
+     *  se sull'entità è null, salta il controllo.Se sull'entità non è presente l'annotazione Version, non fa nulla
+     * @param entity 
      * @param entityClass
-     * @param key
-     * @param request
-     * @param additionalDataMap
-     * @param setMethod
-     * @param getMethod
-     * @throws Exception
-     */
-    protected void manageNullValueMerge(Object entity, Class entityClass, String key, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        setMethod.invoke(entity, (Object) null);
-    }
-
-
-    /**
-     * Gestisce la merge in tutti gli altri casi, essenzialmente chiama l'invoke sul set per settare il value.
-     * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
-     *
-     * @param entity
-     * @param entityClass
-     * @param key
-     * @param value
-     * @param request
-     * @param additionalDataMap
-     * @param setMethod
-     * @param getMethod
-     * @throws Exception
-     */
-    protected void manageOtherCasesMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        setMethod.invoke(entity, value);
-    }
-
-
-    /**
-     * gestione delle enum durante il merge
-     *
-     * @param entity
-     * @param value
-     * @param setMethod
+     * @param pkFieldName
+     * @param data
      * @throws IllegalAccessException
-     * @throws InvocationTargetException
+     * @throws IllegalArgumentException
+     * @throws InvocationTargetException 
+     * @throws OptimisticLockException se i campi version non corrispondono oppure se l'entità ha il campo version, ma questo non è stato passato
      */
-    protected void manageEnumMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
-        value = Enum.valueOf((Class) setMethod.getParameterTypes()[0], (String) value);
-        setMethod.invoke(entity, value);
+    protected void checkVersion(Object entity, Class entityClass, String pkFieldName, Map<String, Object> data) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        Field versionField = EntityReflectionUtils.getVersionField(entityClass);
+        if (versionField != null && 
+                /* se nell'entità c'è solo il campo chiave primario (oppure solo il campo chiave primario e il campo version) vuol dire 
+                 * che non sto modificando questa entità, ma al massimo sto cambiando la foreign key sull'entità padre, per cui salto il controllo
+                */
+                data.keySet().stream().anyMatch(key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName())))
+                ) {
+            Method getMethod = EntityReflectionUtils.getGetMethod(entityClass, versionField.getName());
+            Object entityVersionValue = getMethod.invoke(entity);
+            Object value = data.get(versionField.getName());
+//            if (entityVersionValue == null && value == null) {
+//                
+//            }
+            if (entityVersionValue != null) {
+                if (value != null) {
+                    Class<?> versionFieldType = versionField.getType();
+                    if (versionFieldType.isAssignableFrom(ZonedDateTime.class)) {
+                        value = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+                        entityVersionValue = ((ZonedDateTime)entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
+                    }
+
+                    if (!entityVersionValue.equals(value)) {
+                        throw new OptimisticLockException("i campi version non corrispondono");
+                    }
+                } else {
+                    throw new OptimisticLockException("l'entità ha il campo version, ma questo non è stato passato");
+                }
+            }
+        }
     }
 
     /**
@@ -468,31 +555,384 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NoSuchMethodException
      */
-    protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        Field field = entityClass.getDeclaredField(key);
-        /*
-         * caso in cui l'elemento è un entità singola,
-         * richiamo ricorsivamente il merge sull'oggetto.
-         */
+    protected void manageChildEntityMerge(Object entity, Class entityClass, String key, Map<String, Object> value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
+        
+//        Object currentEntity = beforeUpdateEntityApplier.getCurrentEntity();
+        
+        // Aggiungo alla lista di metodi get il get attuale
+        getMethodsPath.add(getMethod);
+        Field field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+        Class childEntityClass = field.getType();
         boolean inserting = false;
         Object childEntity = getMethod.invoke(entity);
-        Object beforeUpdateEntity = null;
+        childEntity = extractCorrectChildEntity(value, childEntity, childEntityClass);
         if (childEntity == null) {
             inserting = true;
             childEntity = field.getType().newInstance();
-        } else {
-            //                                beforeUpdateEntity = objectMapper.convertValue(childEntity, entityReflectionUtils.getEntityFromProxyObject(childEntity));
-            beforeUpdateEntity = cloneEntity(childEntity);
+        }
+        
+        // Voglio settare sull'entità filia il riferimento all'entità padre (entity)
+//        Field declaredField = entityClass.getDeclaredField(key);
+        if (field != null) {
+            OneToOne oneToOne = Arrays.stream(field.getAnnotationsByType(OneToOne.class)).findFirst().orElse(null);
+            if (oneToOne != null) {
+                String filterFieldName = oneToOne.mappedBy();
+                if (filterFieldName != null && !filterFieldName.equals("")) {
+                    Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
+                    setParentFkMethod.invoke(childEntity, entity);
+                
+                    if (ancestorsFk == null) {
+                        ancestorsFk = new ArrayList();
+                    }
+                    insertAncestorIfExists(childEntity.getClass(), filterFieldName, entity, ancestorsFk);
+                }
+            }
         }
 
-        childEntity = merge(value, childEntity, request, additionalDataMap);
+        boolean willBeEntityModified = willBeEntityModified(childEntity, value);
+        Object beforeUpdateEntity = childEntity;
+        if (willBeEntityModified && !inserting) {
+//            beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+        }
+        
+//        if (ancestorsFk == null) {
+//            ancestorsFk = new ArrayList();
+//        }
+//        ancestorsFk.add(new ImmutablePair(entityClass, entity));
+        
+        childEntity = merge(value, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass, ancestorsFk);
         if (inserting) {
-            childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
-        } else {
-            childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
+            childEntity = restControllerInterceptor.executeBeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+            launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
+                    childEntity, request, additionalDataMap, false, projectionClass));
+        } else if (willBeEntityModified) {
+            childEntity = restControllerInterceptor.executeBeforeUpdateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+            launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
+                    childEntity, request, additionalDataMap, false, projectionClass));
         }
         setMethod.invoke(entity, childEntity);
+        
+//        beforeUpdateEntityApplier.setCurrentEntity(currentEntity);
     }
+
+    /**
+     * Il metodo si occupa di ritornare l'esatta childEntity confrontando la childEntity settata sull'entità e
+     * quella proveniente dal JSON.Per esatta si intende la childEntity con l'id presente nel JSON.
+     *
+     * @param value
+     * @param childEntity
+     * @param childEntityClass
+     * @return
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     * @throws NoSuchMethodException
+     */
+    protected Object extractCorrectChildEntity(Map<String, Object> value, Object childEntity, Class childEntityClass) throws Exception {
+        Object valuePKey = value.get(EntityReflectionUtils.getPrimaryKeyField(childEntityClass).getName());
+        if (childEntity != null) {
+            Object childEntityPKey = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass).invoke(childEntity);
+
+            // se le primary key sono diverse carico l'entità con la primary key indicata nel JSON
+            if (!isKeysEquals(childEntityPKey, valuePKey)) {
+                childEntity = retriveEntity(childEntityClass, valuePKey);
+            }
+        } else if (valuePKey != null) {
+            childEntity = retriveEntity(childEntityClass, valuePKey);
+        }
+
+        return childEntity;
+    }
+
+    /**
+     * Il metodo dato la classe dell'entità e la sua chiave torna l'entità
+     *
+     * @param entityClass
+     * @param entityKey
+     * @return
+     */
+    protected Object retriveEntity(Class entityClass, Object entityKey) {
+        return em.find(entityClass, entityKey);
+    }
+
+    /**
+     * Metodo per confrontare due primary keys, una proviene dal json una dall'entità
+     *
+     * @param key1
+     * @param key2
+     * @return
+     */
+    protected boolean isKeysEquals(Object key1, Object key2) {
+        // se le due primary key hanno tipi diversi provo a convertirli sullo stesso tipo
+        if (!key1.getClass().equals(key2.getClass())) {
+            if (Number.class.isAssignableFrom(key1.getClass())) {
+                if (key1.getClass().equals(Long.class))
+                    key2 = ((Number) key2).longValue();
+            }
+        }
+        return key1.equals(key2);
+    }
+
+    /**
+     * Controlla se l'entità sarà modificata
+     * NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+     *
+     * @param entity
+     * @param values
+     * @return
+     * @throws Exception
+     */
+
+    protected boolean willBeEntityModified(Object entity, Map<String, Object> values) throws Exception {
+        for (String key : values.keySet()) {
+            Object value = values.get(key);
+            Method getMethod = null;
+            Field field = null;
+            try {
+                field = EntityReflectionUtils.getDeclaredField(entity.getClass(), key);
+                getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
+            } catch (Exception ex) {
+            }
+            if (field != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
+                Object valueEntity = getMethod.invoke(entity);
+                
+//                Class<?> versionFieldType = getMethod.getReturnType();
+//                if (versionFieldType.isAssignableFrom(ZonedDateTime.class)) {
+//                    value = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+//                    valueEntity = ((ZonedDateTime)valueEntity).truncatedTo(ChronoUnit.MILLIS);
+//                }
+                // gestiamo casi null
+                if ((value == null && valueEntity != null) || (value != null && valueEntity == null))
+                    return true;
+                if (!(value == null && valueEntity == null) && !value.equals(valueEntity)) {
+
+                    Class valueEntityClass = field.getType();
+                    if (valueEntityClass.isEnum() || valueEntity.getClass().isEnum()) {
+                        Enum enumValue;
+                        try { //nel caso si mette il campo sull'entità come stringa, ma nei getter e setter come enum, la riga seguente darrebbe errore, per cui usiamo il getter come tipo enum
+                            enumValue = Enum.valueOf(valueEntityClass, (String) value);
+                        } catch (Exception ex) {
+                            enumValue = Enum.valueOf((Class) valueEntity.getClass(), (String) value);
+                        }
+                        if (!enumValue.equals(valueEntity))
+                            return true;
+                    }
+                    else if (LocalDate.class.isAssignableFrom(valueEntityClass) ||LocalDateTime.class.isAssignableFrom(valueEntityClass)) {
+                        LocalDateTime dateTime;
+                        try {
+                            // giorno e ora
+                            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.SECONDS);
+                            valueEntity = LocalDateTime.parse(valueEntity.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME).truncatedTo(ChronoUnit.SECONDS);
+                        } catch (Exception ex) {
+                            // solo giorno
+                            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
+                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                        }
+                        if (!dateTime.equals(valueEntity))
+                            return true;
+                    
+                    }else if (ZonedDateTime.class.isAssignableFrom(valueEntityClass)) {
+                        ZonedDateTime zonedDateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
+                        valueEntity = ((ZonedDateTime)valueEntity).truncatedTo(ChronoUnit.MILLIS);
+                        if (!zonedDateTime.equals(valueEntity))
+                            return true;
+                    } else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
+                        Object[] array = ((List) value).toArray((Object[]) Array.newInstance(valueEntityClass.getComponentType(), 0));
+                        if (!Arrays.equals((Object[]) valueEntity, array))
+                            return true;
+                    } else if (EntityReflectionUtils.isEntityClassFromProxyObject(valueEntityClass)) {
+                        boolean changedChild = willBeEntityModified(valueEntity, (Map<String, Object>) value);
+                        if (changedChild)
+                            return true;
+                    } else if (Collection.class.isAssignableFrom(valueEntityClass)) {
+                        Collection collectionValue = (Collection) value;
+                        Collection collectionEntity = (Collection) valueEntity;
+                        //                    boolean hasOrphanRemoval = EntityReflectionUtils.hasOrphanRemoval(field);
+                        if (collectionValue.size() != collectionEntity.size())
+                            // TODO: Qui il contorlolo andrebbe ampliato.
+                            // Solo se la lista ha l'orphan removal allora la differenza di size è davvero significativa
+                            return true;
+                        // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
+                        Type actualTypeArgument = ((ParameterizedType) getMethod.getGenericReturnType()).getActualTypeArguments()[0];
+                        Class childEntityClass = (Class) actualTypeArgument;
+
+                        Field childEntityPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
+                        Method childEntityPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
+                        String childValuePrimaryKeyFieldName = childEntityPrimaryKeyField.getName();
+                        for (Object valueElement : collectionValue) {
+                            Object valueElementPk = ((Map<String, Object>) valueElement).get(childValuePrimaryKeyFieldName);
+                            Object childEntityElement = collectionEntity.stream().filter(
+                                    e -> {
+                                        Object childEntityPk;
+                                        try {
+                                            childEntityPk = childEntityPrimaryKeyGetMethod.invoke(e);
+                                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                                            return false;
+                                        }
+                                        if (childEntityPk == null)
+                                            return false;
+                                        else
+                                            return childEntityPk.equals(valueElementPk);
+                                    }
+                            ).findFirst().orElse(null);
+                            if (childEntityElement == null)
+                                return true;
+                            else {
+                                boolean changedChild = willBeEntityModified(childEntityElement, (Map<String, Object>) valueElement);
+                                if (changedChild)
+                                    return true;
+                            }
+                        }
+                    }
+                    // nel caso in cui sia un Number prima converto il valore della mappa nel Number corretto
+                    else if (Number.class.isAssignableFrom(valueEntityClass)) {
+                        Number convertedValue = convertToRightNumberClass((Number) value, valueEntityClass);
+                        if (!convertedValue.equals(valueEntity))
+                            return true;
+                    }
+                    // questo if gestisce il caso in cui il campo sia una stringa che rappresenta un json
+                    // NB: bisogna mettere valueEntity.toString() perché nel caso valueEntity sia un enum darebbe ClassCastException
+                    else if (String.class.isAssignableFrom(valueEntityClass) && 
+                            !StringUtils.isEmpty(value) && 
+                            isJsonParsable(value) &&
+                            !StringUtils.isEmpty(valueEntity) && 
+                            isJsonParsable(valueEntity)) {
+                        if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
+                            return true;
+                        }
+                    }
+                    // questo if gestisce tutti gli altri casi che verosimilmente saranno i tipi base e i tipi primitivi
+                    // NB: nel caso di classi custom è necessario l'implementazione del metodo equals
+                    else if (!value.equals(valueEntity)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    protected boolean isJsonParsable(Object value) {
+        try {
+            JsonNode valueJsonNode = objectMapper.readTree((String) value);
+            return true;
+        } catch (IOException | ClassCastException ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Gestisce la merge nel caso in cui il campo sia null.
+     * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageNullValueMerge(Object entity, Class entityClass, String key, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        setMethod.invoke(entity, (Object) null);
+    }
+
+    /**
+     * Gestisce il merge in caso di proprietà {@link Number}
+     * questo metodo funziona e viene richiamato solo per classi Wrapper (Integer, Long, etc..)
+     * non viene richiamato nel caso di tipi primitivi (int, long, etc...)
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param value
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageNumericMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        Class setClass = setMethod.getParameterTypes()[0];
+        Number valueNumber = convertToRightNumberClass((Number) value, setClass);
+
+        setMethod.invoke(entity, valueNumber);
+    }
+
+    /**
+     * Converte il number passato come parametro nella classe indicata da setClass
+     * @param value
+     * @param setClass
+     * @return il number castato
+     */
+    protected Number convertToRightNumberClass(Number value, Class<? extends Number> setClass) {
+        Number valueNumber = value;
+        if (Integer.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.intValue();
+        else if (Long.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.longValue();
+        else if (Float.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.floatValue();
+        else if (Double.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.doubleValue();
+        else if (Short.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.shortValue();
+        else if (Byte.class.isAssignableFrom(setClass))
+            valueNumber = valueNumber.byteValue();
+        return valueNumber;
+    }
+
+    /**
+     * Gestisce la merge in tutti gli altri casi, essenzialmente chiama l'invoke sul set per settare il value.
+     * è visto come un metodo che può essere sovrascritto per gestire casistiche paricolari di progetto
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param value
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageOtherCasesMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        setMethod.invoke(entity, value);
+    }
+
+    /**
+     * Gestisce la merge del caso in cui la colonna è di tipo json, 
+     * essenzialmente chiama l'invoke sul set per settare il value 
+     * convertendolo al tipo corretto tramite l'objectMapper
+     *
+     * @param entity
+     * @param entityClass
+     * @param key
+     * @param value
+     * @param request
+     * @param additionalDataMap
+     * @param setMethod
+     * @param getMethod
+     * @throws Exception
+     */
+    protected void manageJsonMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+        setMethod.invoke(entity, objectMapper.convertValue(value, setMethod.getParameterTypes()[0]));
+    }
+    
+    /**
+     * gestione delle enum durante il merge
+     *
+     * @param entity
+     * @param value
+     * @param setMethod
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     */
+    protected void manageEnumMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
+        value = Enum.valueOf((Class) setMethod.getParameterTypes()[0], (String) value);
+        setMethod.invoke(entity, value);
+    }
+
 
     /**
      * Gestione degli array durante il merge.
@@ -508,7 +948,7 @@ public abstract class RestControllerEngine {
     protected void manageArrayMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
         /*
          * Viene creato un array che contiere oggetti del tipo
-         * identificato dal campo nell'entity; una volta creato
+         * identificato dal campo nell'entities; una volta creato
          * l'array viene popolato con i valori passati nella
          * richiesta.
          */
@@ -530,14 +970,27 @@ public abstract class RestControllerEngine {
      * @throws InvocationTargetException
      */
     protected void manageDateMerge(Object entity, Object value, Method setMethod) throws IllegalAccessException, InvocationTargetException {
-        LocalDateTime dateTime;
-        try {
-            // giorno e ora
-            dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        } catch (Exception ex) {
-            // solo giorno
-            //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+        Object dateTime;
+        
+        Class<?> dateType = setMethod.getParameterTypes()[0];
+        if (dateType.isAssignableFrom(LocalDateTime.class)) {
+            try {
+                dateTime = LocalDateTime.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
+            }
+        } else if (dateType.isAssignableFrom(ZonedDateTime.class)) {
+            try {
+                dateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
+            }
+        } else {
+            try {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (Exception ex) {
+                dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            }
         }
         value = dateTime;
         setMethod.invoke(entity, value);
@@ -566,10 +1019,14 @@ public abstract class RestControllerEngine {
      * @throws EntityReflectionException
      * @throws AbortSaveInterceptorException
      */
-    protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
+    protected void manageCollectionMerge(Object entity, Class entityClass, String key, Collection value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod, ArrayList<Object> getMethodsPath, Class projectionClass, List<Pair> ancestorsFk) throws Exception {
+//        Object currentEntity = beforeUpdateEntityApplier.getCurrentEntity();
+        
+        // Aggiungo alla lista di metodi get il metodo get attuale
+        getMethodsPath.add(getMethod);
         // questo è il tipo della collection(quello scritto tra <>), lo otteniamo dal parametro passato alla set del metodo dell'entità padre
         Type actualTypeArgument = ((ParameterizedType) setMethod.getGenericParameterTypes()[0]).getActualTypeArguments()[0];
-        Class childEntityClass = Class.forName(actualTypeArgument.getTypeName());
+        Class childEntityClass = (Class) actualTypeArgument;
 
         // contiene i valori passati
         Collection<Map<String, Object>> childValues = value;
@@ -585,15 +1042,16 @@ public abstract class RestControllerEngine {
         Field entityField = entityClass.getDeclaredField(key);
 
         ArrayList newElementCollection = new ArrayList();
-        Field childPrimaryKeyField = entityReflectionUtils.getPrimaryKeyField(childEntityClass);
-        Method childPrimaryKeyGetMethod = entityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
+        Field childPrimaryKeyField = EntityReflectionUtils.getPrimaryKeyField(childEntityClass);
+        Method childPrimaryKeyGetMethod = EntityReflectionUtils.getPrimaryKeyGetMethod(childEntityClass);
+        int collIndex = 0;
         for (Map<String, Object> childValue : childValues) {
             Object childEntity;
-            boolean inserting = true;
+            boolean inserting = false;
             /* controllo se nell'entità passata è presente l'id (la primary key in generale)
              * se c'è cerco l'oggetto nella lista degli elementi presenti nell'entità:
              * - se lo trovo allora vorrà dire che farò un update
-             * - se non lo trovo allora vorrà dire che farò un insert
+             * - se non lo trovo allora provo a caricarla dal DB, se c'è allora vuol dire che la voglio associare all'entità, altrimenti vorrà dire che farò un insert
              */
             Object childValuePk = childValue.get(childPrimaryKeyField.getName());
 
@@ -602,7 +1060,7 @@ public abstract class RestControllerEngine {
                     Object pk;
                     try {
                         pk = childPrimaryKeyGetMethod.invoke(e);
-                    } catch (Exception ex) {
+                    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                         return false;
                     }
                     return pk.equals(childValuePk);
@@ -611,10 +1069,15 @@ public abstract class RestControllerEngine {
                     inserting = false;
                     childEntity = childEntityOp.get();
                 } else {
-                    childEntity = childEntityClass.getConstructor().newInstance();
-                    //                                    childEntity = objectMapper.convertValue(childValue, childEntityClass);
+                    // se la trovo sul DB allora la associo all'entità
+                    childEntity = retriveEntity(childEntityClass, childValuePk);
+                    if (childEntity == null) { // se non c'è sul DB allora ne creerò una nuova
+                        inserting = true;
+                        childEntity = childEntityClass.getConstructor().newInstance();
+                    }
                 }
             } else {
+                inserting = true;
                 childEntity = childEntityClass.getConstructor().newInstance();
             }
 
@@ -622,50 +1085,84 @@ public abstract class RestControllerEngine {
              * Siccome gli oggetti della lista sono per forza figli dell'entità padre, togliamo gli eventuali riferimenti
              * all'entità padre e settiamo forzatamente quello giusto.
              * Es. se stiamo agendo sull'entità Azienda con id = 1 e nella lista troviamo:
-             * [ {
-             * "nome": "gdm",
-             * "cognome": dmg,
-             * "fk_idAzienda": {
-             * "id": 3
-             * }
-             * },
-             * {
-             * "nome": "gdm",g
-             * "cognome": dmg,
-             * "idAzienda": {
-             * "id": 3,
-             * "nome": "Ausl Parma"
-             * }
-             * } ]
+             * [
+             *  {
+             *      "nome": "gdm",
+             *      "cognome": dmg,
+             *      "fk_idAzienda": {
+             *          "id": 3
+             *      }
+             *  },
+             *  {
+             *      "nome": "gdm",g
+             *      "cognome": dmg,
+             *      "idAzienda": {
+             *          "id": 3,
+             *      "nome": "Ausl Parma"
+             *      }
+             *  }
+             * ]
              * devo rimuovere dalla prima entità l'oggetto "fk_idAzienda" e dalla seconda l'oggetto "idAzienda",
              * perché si riferiscono a un'azienda diversa da quella di cui la lista è figlia
              */
-            // filterFieldName mi da il nome del campo interessato (nell'esempio precedente "idAzienda")
-            String filterFieldName = entityReflectionUtils.getFilterFieldName(entityField, entityClass);
-            // vado a rimuovere dal json passato i campi interessati
-            ((Map) ((Map) childValue)).remove(filterFieldName);
-            ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
-            // trovo il metodo set per settare sull'entità l'oggetto padre
-            Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
-            // setto sull'entità l'oggetto padre corretto (che è appunto l'entità padre, dalla quale ho tirato fuori la collection)
-            setParentFkMethod.invoke(childEntity, entity);
 
-            Object beforeUpdateEntity = null;
-            if (!inserting) {
-                //                                beforeUpdateEntity = objectMapper.convertValue(childEntity, childEntityClass);
-                beforeUpdateEntity = cloneEntity(childEntity);
+            // filterFieldName mi da il nome del campo interessato (nell'esempio precedente "idAzienda")
+            String filterFieldName = EntityReflectionUtils.getFilterFieldName(entityField, entityClass);
+            
+            // se non trovo filterFieldName lascio perdere questo controllo
+            if (filterFieldName != null && !filterFieldName.equals("")) {
+                // vado a rimuovere dal json passato i campi interessati
+                ((Map) ((Map) childValue)).remove(filterFieldName);
+                ((Map) ((Map) childValue)).remove("fk_" + filterFieldName);
+                // trovo il metodo set per settare sull'entità l'oggetto padre
+                Method setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), filterFieldName);
+                // setto sull'entità l'oggetto padre corretto (che è appunto l'entità padre, dalla quale ho tirato fuori la collection)
+                setParentFkMethod.invoke(childEntity, entity);
+                
+                if (ancestorsFk == null) {
+                    ancestorsFk = new ArrayList();
+                }
+                insertAncestorIfExists(childEntity.getClass(), filterFieldName, entity, ancestorsFk);
+//                for (Pair ancestorFk : ancestorsFk) {
+//                    setParentFkMethod = EntityReflectionUtils.getSetMethod(childEntity.getClass(), (String)ancestorFk.getLeft());
+//                    if (setParentFkMethod != null) {
+//                        setParentFkMethod.invoke(childEntity, ancestorFk.getRight());
+//                    }
+//                }
+//                ancestorsFk.add(new ImmutablePair(entity.getClass(), entity));
             }
+
+            boolean willBeEntityModified = false;
+            Object beforeUpdateEntity = childEntity;
+            if (!inserting) {
+                willBeEntityModified = willBeEntityModified(childEntity, childValue);
+                if (willBeEntityModified) {
+//                    beforeUpdateEntityApplier.setCurrentEntity(childEntity);
+                }
+            }
+
+            // Aggiungo alla lista di metodi get l'indice che l'entità su cui sto lavorando ha nella collection
+            getMethodsPath.add(collIndex);
             // per ognuno chiamo ricorsivamente il merge in modo da gestire gli eventuali figli
-            childEntity = merge(childValue, childEntity, request, additionalDataMap);
+            childEntity = merge(childValue, childEntity, request, additionalDataMap, commonUtils.getNewInstanceOfCollection(getMethodsPath), projectionClass, ancestorsFk);
 
             if (inserting) {
-                childEntity = restControllerInterceptor.executebeforeCreateInterceptor(childEntity, request, additionalDataMap);
-            } else {
-                childEntity = restControllerInterceptor.executebeforeUpdateInterceptor(childEntity, beforeUpdateEntity, request, additionalDataMap);
+
+                childEntity = restControllerInterceptor.executeBeforeCreateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+                launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.CREATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
+                        childEntity,request, additionalDataMap, false, projectionClass));
+
+            } else if (willBeEntityModified) {
+                childEntity = restControllerInterceptor.executeBeforeUpdateInterceptor(childEntity, request, additionalDataMap, false, projectionClass);
+                launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.UPDATE,NextSdrControllerInterceptor.InterceptorType.BEFORE, getMethodsPath,
+                        childEntity, request, additionalDataMap, false, projectionClass));
             }
+            // Rimuovo l'indice prima inserito (in modo che non compaia nella lista passata ad interceptor di altre entità di questa collection)
+            getMethodsPath.remove(getMethodsPath.size()-1);
 
             // aggiungo l'elemento alla collection dell'entità
             newElementCollection.add(childEntity);
+            collIndex++;
         }
 
         /*
@@ -673,21 +1170,23 @@ public abstract class RestControllerEngine {
          * Gli elementi che saranno rimossi sono quelli presenti sull'entità, ma che non sono passati nel json della richiesta.
          * Se ci sono elementi che saranno rimossi lancio l'interceptor beforeDelete ricorsivamente su tutti
          */
-        if (entityReflectionUtils.hasOrphanRemoval(entityField)) {
+        if (EntityReflectionUtils.hasOrphanRemoval(entityField)) {
             ArrayList deletedEntities = new ArrayList();
 
             // Inizialmente nella collection degli elementi eliminati inserisco tutti gli elementi presenti sull'entità
             deletedEntities.addAll(entityElementsCollection);
             // ora rimuovo gli elementi che sto inserendo/modificando; con questo ottengo gli elementi che saranno eliminati
             deletedEntities.removeAll(newElementCollection);
-            //                        deletedEntitiesMap.put(getMethod.toGenericString(), deletedEntities);
+            // deletedEntitiesMap.put(getMethod.toGenericString(), deletedEntities);
 
             if (!deletedEntities.isEmpty()) {
                 for (Object deletedEntity : deletedEntities) {
                     try {
-                        launchNestedBefereDeleteInterceptor(deletedEntity, request, additionalDataMap);
+                        restControllerInterceptor.launchNestedDeleteInterceptor(deletedEntity, request, additionalDataMap, new HashMap(), NextSdrControllerInterceptor.InterceptorType.BEFORE, false, projectionClass);
+                        launchedBeforeInterceptors.add(new ParameterizedInterceptor(NextSdrControllerInterceptor.InterceptorOperation.DELETE, NextSdrControllerInterceptor.InterceptorType.BEFORE, new ArrayList<>(),
+                                deletedEntity, request, additionalDataMap, false, projectionClass));
                     } catch (SkipDeleteInterceptorException ex) {
-                        log.info("delete saltato come richiesto", ex);
+                        LOGGER.info("delete saltato come richiesto", ex);
                     }
                 }
             }
@@ -696,10 +1195,12 @@ public abstract class RestControllerEngine {
         // infine svuoto la collection dell'entità e inserisco gli elementi passati
         entityElementsCollection.clear();
         entityElementsCollection.addAll(newElementCollection);
+//        beforeUpdateEntityApplier.setCurrentEntity(currentEntity);
     }
 
     /**
-     * Il metodo serve per gestire le fk durante la merge dell'oggetto
+     * Il metodo serve per gestire le fk durante la merge dell'oggetto.
+     * Non più usato
      *
      * @param entity
      * @param entityClass
@@ -711,6 +1212,7 @@ public abstract class RestControllerEngine {
      * @throws IllegalAccessException
      * @throws InvocationTargetException
      */
+    @Deprecated
     protected void manageFkMerge(Object entity, Class entityClass, String key, Object value) throws NoSuchFieldException, EntityReflectionException, RestControllerEngineException, IllegalAccessException, InvocationTargetException {
         /*
          * si cerca il campo sulla classe dell'entità corrispondente
@@ -718,7 +1220,7 @@ public abstract class RestControllerEngine {
          * prefisso "fk_"
          */
         String fieldName = key.substring("fk_".length());
-        Field fkField = entityReflectionUtils.getEntityFromProxyObject(entity).getDeclaredField(fieldName);
+        Field fkField = EntityReflectionUtils.getEntityFromProxyObject(entity).getDeclaredField(fieldName);
 
         // se il campo fk_ si riferisce a una collection (es. fk_pecUtenteList) lo devo ignorare
         if (!Collection.class.isAssignableFrom(fkField.getType())) {
@@ -733,7 +1235,7 @@ public abstract class RestControllerEngine {
             // se si passa "fk_" con id null, vuol dire che voglio settare a null la fk per cui lascio l'oggetto fkReference a null
             if (fk.getId() != null) {
                 /*
-                 * viene creata l'entità tramite entity manager in modo che
+                 * viene creata l'entità tramite entities manager in modo che
                  * hibernate capisca che non la deve inserire
                  */
                 fkReference = em.getReference(fkField.getType(), fk.getId());
@@ -749,45 +1251,16 @@ public abstract class RestControllerEngine {
 
     /**
      * Clona un'entità usando jackson. Prima la trasforma in String e poi crea un oggetto a partire dalla quella.
+     * usare BeforeUpdateEntityApplier al suo posto, perché con la modalità usata in questa funzione potrebbero non esser copiate proprietà identificate con {@link com.fasterxml.jackson.annotation.JsonIgnore} o {@link com.fasterxml.jackson.annotation.JsonBackReference}
      *
      * @param entity l'entità da clonare
      * @return il clone dell'entità
      * @throws IOException
      * @throws EntityReflectionException
      */
+    @Deprecated
     private Object cloneEntity(Object entity) throws IOException, EntityReflectionException {
-        return objectMapper.readValue(objectMapper.writeValueAsString(entity), entityReflectionUtils.getEntityFromProxyObject(entity));
-    }
-
-    /**
-     * lancia gli interceptor "beforeDelete" sull'entità passata e su tutte le entità figlie
-     *
-     * @param entity
-     * @param request
-     * @param additionalData
-     * @throws ClassNotFoundException
-     * @throws AbortSaveInterceptorException
-     * @throws EntityReflectionException
-     * @throws SkipDeleteInterceptorException
-     * @throws RestControllerEngineException
-     * @throws IllegalAccessException
-     * @throws IllegalArgumentException
-     * @throws InvocationTargetException
-     */
-    private void launchNestedBefereDeleteInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException, SkipDeleteInterceptorException, RestControllerEngineException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-        Field[] fields = entity.getClass().getDeclaredFields();
-        if (fields != null && fields.length > 0) {
-            for (Field field : fields) {
-                if (Collection.class.isAssignableFrom(field.getType())) {
-                    Method getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), field.getName());
-                    Collection childEntityCollection = (Collection) getMethod.invoke(entity);
-                    for (Object childEntity : childEntityCollection) {
-                        launchNestedBefereDeleteInterceptor(childEntity, request, additionalData);
-                    }
-                }
-            }
-        }
-        restControllerInterceptor.executebeforeDeleteInterceptor(entity, request, additionalData);
+        return objectMapper.readValue(objectMapper.writeValueAsString(entity), EntityReflectionUtils.getEntityFromProxyObject(entity));
     }
 
     /**
@@ -801,21 +1274,31 @@ public abstract class RestControllerEngine {
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    protected String batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {       
+        Object res = null;
         for (BatchOperation batchOperation : data) {
+            JpaRepository generalRepository = (JpaRepository) this.customRepositoryPathMap.get(batchOperation.getEntityPath());
+            Class projectionClass = getProjectionClass(batchOperation.getReturnProjection(), generalRepository);
             switch (batchOperation.getOperation()) {
                 case INSERT:
-                    insert(batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
+                    res = insert((Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
+                    projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
+                    // batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
+                    batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case UPDATE:
-                    update(batchOperation.getId(), batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
+                    res = update(batchOperation.getId(), (Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));                    
+                    projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
+                    batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case DELETE:
-                    delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true);
+                    delete(batchOperation.getId(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
                     break;
             }
         }
-        return objectMapper.writeValueAsString(data);
+        return data;
     }
 
     /**
@@ -826,7 +1309,7 @@ public abstract class RestControllerEngine {
      * @return
      * @throws RestControllerEngineException
      */
-    protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
+    public NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
         String repositoryKey = request.getServletPath();
 
         if (withId) {
@@ -835,9 +1318,32 @@ public abstract class RestControllerEngine {
                 repositoryKey = repositoryKey.substring(0, slashPos);
             }
         }
-        NextSdrQueryDslRepository generalRepository = customRepositoryPathMap.get(repositoryKey);
-        return generalRepository;
+        
+        if (repositoryKey == null || !customRepositoryPathMap.containsKey(repositoryKey)) {
+            throw new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
+        }
+        return customRepositoryPathMap.get(repositoryKey);
     }
+    
+    /**
+     * Trova il repositori a partire dalla request usando la servletPath per individuarlo (non funziona nel caso di richiesta batch)
+     *
+     * @param request
+     * @param withId  passare "true" se la richiesta contiene /id
+     * @return
+     * @throws RestControllerEngineException
+     */
+//    protected NextSdrQueryDslRepository getGeneralRepository(HttpServletRequest request, boolean withId) throws RestControllerEngineException {
+//        String repositoryKey = request.getServletPath();
+//
+//        String repoKey =  customRepositoryPathMap.keySet().stream().filter(s -> {
+//            return request.getServletPath().toLowerCase().contains(s);
+//        }).findFirst().orElse(null);
+//        if (repoKey == null) {
+//            new RestControllerEngineException(String.format("no repository for Servlet path %s", request.getServletPath()));
+//        }
+//        return customRepositoryPathMap.get(repoKey);
+//    }
 
     /**
      * Trova la classe projection a partire dal nome passato come parametro.
@@ -851,7 +1357,7 @@ public abstract class RestControllerEngine {
         Class res;
         if (projection == null) {
             try {
-                res = entityReflectionUtils.getDefaultProjection(repository);
+                res = EntityReflectionUtils.getDefaultProjection(repository);
             } catch (EntityReflectionException ex) {
                 throw new RestControllerEngineException(ex);
             }
@@ -867,7 +1373,7 @@ public abstract class RestControllerEngine {
      * @param additionalData la stringa da parsare
      * @return
      */
-    protected Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
+    public Map<String, String> parseAdditionalDataIntoMap(String additionalData) {
         if (additionalData != null && !additionalData.isEmpty()) {
             return Splitter.on(",").withKeyValueSeparator("=").split(additionalData);
         } else {
@@ -890,16 +1396,17 @@ public abstract class RestControllerEngine {
      * @return
      * @throws RestControllerEngineException
      */
-    protected Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
+    @Transactional(readOnly = true)
+    public Object getResources(HttpServletRequest request, Object id, String projection, Predicate predicate, Pageable pageable, String additionalData, EntityPathBase path, Class entityClass) throws RestControllerEngineException, AbortLoadInterceptorException {
         Object resource = null;
-        Class projectionClass;
+        Class projectionClass;   
         /*
          * trasforma gli additionalData espressi in stringa in una mappa vera
          * attraverso un metodo di Google
          */
         Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
 
-        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entity sulle projections
+        // setto gli additionalData e la request sulla classe che gestisce gli interceptor delle projection, questo metodo svuota anche la cache delle entities sulle projections
         projectionsInterceptorLauncher.setRequestParams(additionalDataMap, request);
 
         /*
@@ -910,6 +1417,7 @@ public abstract class RestControllerEngine {
          * Spring ha una mappa dove la chiave ha il nome della classe in lowerCamelcase mentre il valore corrisponde al valore dei repository
          */
         NextSdrQueryDslRepository generalRepository = getGeneralRepository(request, id != null);
+
         try {
             // si va a prendere la classe della projection, se viene messa nella chiamata
             projectionClass = getProjectionClass(projection, generalRepository);
@@ -919,7 +1427,7 @@ public abstract class RestControllerEngine {
 
         try {
             // inserimento come predicato dell'eventuale interceptor
-            predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap);
+            predicate = restControllerInterceptor.executeBeforeSelectQueryInterceptor(predicate, entityClass, request, additionalDataMap, true, projectionClass);
         } catch (ClassNotFoundException | EntityReflectionException ex) {
             throw new RestControllerEngineException(ex);
         }
@@ -932,18 +1440,18 @@ public abstract class RestControllerEngine {
              */
             BooleanExpression findByIdExpression = new PathBuilder(
                     BooleanExpression.class, path.getRoot().toString()).
-                    get(entityReflectionUtils.getPrimaryKeyField((Class) path.getAnnotatedElement()).getName()).eq(id).
+                    get(EntityReflectionUtils.getPrimaryKeyField((Class) path.getAnnotatedElement()).getName()).eq(id).
                     and(predicate);
 
             // avendo la query la si esegue sul repository
             Optional<Object> entityOptional = generalRepository.findOne(findByIdExpression);
             // controllo della presenza del risultato
             if (entityOptional.isPresent()) {
-                // si ottiene la entity
+                // si ottiene la entities
                 Object entity = entityOptional.get();
                 try {
                     // applicazione di afterSelectQueryInterceptor
-                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityClass, request, additionalDataMap);
+                    entity = restControllerInterceptor.executeAfterSelectQueryInterceptor(entity, null, entityClass, request, additionalDataMap, true, projectionClass);
                 } catch (ClassNotFoundException | InterceptorException | EntityReflectionException ex) {
                     throw new RestControllerEngineException("errore nell'esecuzione dell'interceptor", ex);
                 }
@@ -957,16 +1465,23 @@ public abstract class RestControllerEngine {
              * caso in cui non è stato passato un id specifico da ricercare,
              * quindi lo devo fare su tutti i record di una classe
              */
-            Page entities = generalRepository.findAll(predicate, pageable);
+            Page entities;
+            if ((OffsetLimitPageRequest.class.isAssignableFrom(pageable.getClass()) && ((OffsetLimitPageRequest)pageable).getNoCount())
+                    || (NextSdrPageable.class.isAssignableFrom(pageable.getClass()) && ((NextSdrPageable)pageable).getNoCount())){ // Boolean.parseBoolean(request.getParameter("noCount"))
+                entities = generalRepository.findAllNoCount(predicate, pageable);
+            } else {
+                entities = generalRepository.findAll(predicate, pageable);
+            }
+            
             try {
                 // applicare after select multiplo
                 ArrayList<Object> arrayList = new ArrayList<>(entities.getContent());
                 /*
-                 * si spacchetta la Page che contiene le entity e si passa il
+                 * si spacchetta la Page che contiene le entities e si passa il
                  * tutto all'interceptor; una volta applicato l'interceptor
                  * viene ricreata la Page
                  */
-                List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap);
+                List<Object> res = (List<Object>) restControllerInterceptor.executeAfterSelectQueryInterceptor(null, arrayList, entityClass, request, additionalDataMap, true, projectionClass);
                 entities = new PageImpl<>(res, entities.getPageable(), entities.getTotalElements());
 
             } catch (ClassNotFoundException | InterceptorException | EntityReflectionException ex) {
@@ -975,11 +1490,48 @@ public abstract class RestControllerEngine {
             // per ogni elemento della pagina gli si applica la createProjection
             Page<Object> projected = entities.map(l -> factory.createProjection(projectionClass, l));
             // assembla il risultato in HAL
-            resource = assembler.toResource(projected);
+            resource = assembler.toModel(projected);
 //            resource = assembler.toResource(entities);
         }
+        
         return resource;
     }
-
-
+    
+    /**
+     * Questa funzione si occupa di riempire le FK verso entità padri (e nonni etc)
+     * Le fk da riempire e l'oggetto con cui riempirle sono scritte dentro la lista ancestorsFk
+     * @param entity
+     * @param entityClass
+     * @param ancestorsFk è una lista di Pair. Left: Classe dell'entità. Right: Entità
+     * @param data 
+     */
+    private void manageAncestorsMege(Object entity, Class entityClass, List<Pair> ancestorsFk, Map<String, Object> data) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+        for (Pair ancestorFk : ancestorsFk) {
+            Field[] declaredFields = entityClass.getDeclaredFields();
+            for (Field field : declaredFields) {
+                NextSdrAncestor annotation = field.getAnnotation(NextSdrAncestor.class);
+                if (annotation != null && annotation.relationName().equals((String)ancestorFk.getLeft())) {
+                    if (!data.containsKey(field.getName())) {
+                        Method setParentFkMethod = EntityReflectionUtils.getSetMethod(entityClass, field.getName());
+                        if (setParentFkMethod != null) {
+                            setParentFkMethod.invoke(entity, ancestorFk.getRight());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private void insertAncestorIfExists(Class entityClass, String fieldName, Object entity, List<Pair> ancestorsFk) {
+        Field[] declaredFields = entityClass.getDeclaredFields();
+        for (Field field : declaredFields) {
+            if (field.getName().equals(fieldName)) {
+                NextSdrAncestor annotation = field.getAnnotation(NextSdrAncestor.class);
+                if (annotation != null) {
+                    ancestorsFk.add(new ImmutablePair(annotation.relationName(), entity));
+                }
+                break;
+            }
+        }
+    }
 }
