@@ -117,9 +117,19 @@ public class EntityReflectionUtils {
         return columnAnnotation != null || isVersionField(field) || EntityReflectionUtils.isForeignKeyField(field);
     }
     
+    public static boolean isColumnOrVersionOrFkOrTransientField(Field field) {
+        java.lang.annotation.Annotation columnAnnotation = field.getAnnotation(Column.class);
+        return columnAnnotation != null || isVersionField(field) || isForeignKeyField(field) || isTransientField(field);
+    }
+    
     public static boolean isVersionField(Field field) {
         java.lang.annotation.Annotation versionAnnotation = field.getAnnotation(Version.class);
         return versionAnnotation != null;
+    }
+    
+    public static boolean isTransientField(Field field) {
+        java.lang.annotation.Annotation transientAnnotation = field.getAnnotation(Transient.class);
+        return transientAnnotation != null;
     }
 
     /**
