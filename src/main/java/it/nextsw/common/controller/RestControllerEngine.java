@@ -444,7 +444,7 @@ public abstract class RestControllerEngine {
                     getMethod = EntityReflectionUtils.getGetMethod(entity.getClass(), key);
                 } catch (Exception ex) {
                 }
-                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkField(field)) {
+                if (field != null && setMethod != null && getMethod != null && EntityReflectionUtils.isColumnOrVersionOrFkOrTransientField(field)) {
                     if (value != null) {
                         if (setMethod.getParameterTypes()[0].isAssignableFrom(LocalDate.class) || setMethod.getParameterTypes()[0].isAssignableFrom(LocalDateTime.class) || setMethod.getParameterTypes()[0].isAssignableFrom(ZonedDateTime.class)) {
                             manageDateMerge(entity, value, setMethod);
