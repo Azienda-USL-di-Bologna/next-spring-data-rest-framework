@@ -538,7 +538,7 @@ public abstract class RestControllerEngine {
                         entityVersionValue = ((ZonedDateTime) entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
                     }
 
-                    if (!entityVersionValue.equals(value)) {
+                    if (!((ZonedDateTime)entityVersionValue).isEqual((ZonedDateTime)value)) {
                         throw new OptimisticLockException("i campi version non corrispondono");
                     }
                 } else {
