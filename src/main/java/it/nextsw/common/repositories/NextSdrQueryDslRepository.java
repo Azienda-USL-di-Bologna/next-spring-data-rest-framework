@@ -509,14 +509,14 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
 
         StringOperation stringOperation = getStringOperation(valueToParse);
       
-        if (stringOperation.getOperator().equals(StringOperation.Operators.equals)) {
-            res = stringPath.eq(stringOperation.getValue());
-        } else {
-            res = Expressions.booleanTemplate(
-                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
-                stringPath
-            );
-        }
+//        if (stringOperation.getOperator().equals(StringOperation.Operators.equals)) {
+//            res = stringPath.eq(stringOperation.getValue());
+//        } else {
+//            res = Expressions.booleanTemplate(
+//                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
+//                stringPath
+//            );
+//        }
         /**
          * TODO:
          * Non cancellare il seguente codice in quanto il codice che usa la fuznione 'like' è specifico per postgres.
@@ -544,6 +544,20 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
 //            default:
 //                throw new InvalidFilterException(String.format("operatore %s non valido", stringOperation.getOperator()));
 //        }
+        switch (stringOperation.getOperator()) {
+            case notEquals:
+                res = stringPath.ne(stringOperation.getValue());
+                break;
+            case equals:
+                res = stringPath.eq(stringOperation.getValue());
+                break;
+            default:
+                res = Expressions.booleanTemplate(
+                    String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
+                    stringPath
+                );
+//                throw new InvalidFilterException(String.format("operatore %s non valido", stringOperation.getOperator()));
+        }
         return res;
     }
 
