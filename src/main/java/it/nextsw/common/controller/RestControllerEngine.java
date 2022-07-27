@@ -225,6 +225,10 @@ public abstract class RestControllerEngine {
                     }
                 }
             }
+            
+            if (!batch) {
+                projectionsInterceptorLauncher.setRequestParams(additionalData, request);
+            }
 
             /*
              * Il metodo merge setta i valori passati sull'entità ricorsivamente, inolte lancia i giusti interceptor sui figli.
@@ -376,7 +380,11 @@ public abstract class RestControllerEngine {
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
                 res = merge(data, entity, request, additionalData, new ArrayList(), projectionClass, null);
-
+                
+                if (!batch) {
+                    projectionsInterceptorLauncher.setRequestParams(additionalData, request);
+                }
+                
                 restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
@@ -538,7 +546,7 @@ public abstract class RestControllerEngine {
                         entityVersionValue = ((ZonedDateTime) entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
                     }
 
-                    if (!entityVersionValue.equals(value)) {
+                    if (!((ZonedDateTime)entityVersionValue).isEqual((ZonedDateTime)value)) {
                         throw new OptimisticLockException("i campi version non corrispondono");
                     }
                 } else {

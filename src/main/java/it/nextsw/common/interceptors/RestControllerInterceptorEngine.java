@@ -104,7 +104,14 @@ public class RestControllerInterceptorEngine {
     public Object executeAfterCreateInterceptor(Object entity, HttpServletRequest request, Map<String, String> additionalData, boolean mainEntity, Class projectionClass) throws ClassNotFoundException, AbortSaveInterceptorException, EntityReflectionException {
 //        fillInterceptorsCache();
 //        log.info(String.format("find %s interceptors on %s...", "afterCreateEntityInterceptor", entity.toString()));
-        List<NextSdrControllerInterceptor> interceptors = getInterceptors(EntityReflectionUtils.getEntityFromProxyObject(entity));
+        List<NextSdrControllerInterceptor> interceptors = null;
+        try {
+            Class entityClass = EntityReflectionUtils.getEntityFromProxyObject(entity);
+            interceptors = getInterceptors(entityClass);
+        } catch (EntityReflectionException ex) {
+            log.warn("l'entità non deriva dalla classe entity, forse l'oggetto è stat oeliminato dall'interceptor?", ex);
+        }
+        
         if (interceptors != null) {
             for (NextSdrControllerInterceptor interceptor : interceptors) {
 //                log.info(String.format("execute %s on %s", "afgerCreateEntityInterceptor", entity.toString()));
