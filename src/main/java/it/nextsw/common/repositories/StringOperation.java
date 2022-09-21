@@ -12,7 +12,6 @@ public class StringOperation {
         contains,
         containsIgnoreCase,
         equals,
-        notEquals,
         equalsIgnoreCase
     }
 
