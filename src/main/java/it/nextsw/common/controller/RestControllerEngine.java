@@ -162,6 +162,7 @@ public abstract class RestControllerEngine {
      * @param data - dati grezzi passati nella richiesta
      * @param request
      * @param additionalData
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -173,7 +174,7 @@ public abstract class RestControllerEngine {
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      */
-    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException {
+    public Object insert(Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, Boolean refreshSavedEntity, String entityPath, boolean batch, String projection) throws RestControllerEngineException, AbortSaveInterceptorException {
 //        Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
         launchedBeforeInterceptors = new ArrayList<>();
 
@@ -248,6 +249,9 @@ public abstract class RestControllerEngine {
 
             // salvataggio dell'entità
             generalRepository.save(entity);
+            if (refreshSavedEntity) {                
+                em.refresh(entity);
+            }
 
             if (inserting) {
                 entity = restControllerInterceptor.executeAfterCreateInterceptor(entity, request, additionalData, true, projectionClass);
@@ -339,6 +343,7 @@ public abstract class RestControllerEngine {
      * @param data
      * @param request
      * @param additionalData
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -352,7 +357,7 @@ public abstract class RestControllerEngine {
      * @throws NotFoundResourceException
      * @throws AbortSaveInterceptorException
      */
-    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException, AbortSaveInterceptorException {
+    public Object update(Object id, Map<String, Object> data, HttpServletRequest request, Map<String, String> additionalData, Boolean refreshSavedEntity, String entityPath, boolean batch, String projection) throws RestControllerEngineException, NotFoundResourceException, AbortSaveInterceptorException {
         try {
 //            Map<String, String> additionalDataMap = parseAdditionalDataIntoMap(additionalData);
             launchedBeforeInterceptors = new ArrayList();
@@ -388,6 +393,9 @@ public abstract class RestControllerEngine {
                 restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
+                if (refreshSavedEntity) {                
+                    em.refresh(res);
+                }
 
                 // TODO: richiamare l'interceptor di after anche sulle entità correlate modificate
                 restControllerInterceptor.executeAfterUpdateInterceptor(entity, request, additionalData, true, projectionClass);
@@ -1319,14 +1327,14 @@ public abstract class RestControllerEngine {
             Class projectionClass = getProjectionClass(batchOperation.getReturnProjection(), generalRepository);
             switch (batchOperation.getOperation()) {
                 case INSERT:
-                    res = insert((Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = insert((Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getRefreshSavedEntity(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
                     // batchOperation.setEntityBody(objectMapper.convertValue(factory.createProjection(projectionClass, res), Map.class));
                     batchOperation.setEntityBody(factory.createProjection(projectionClass, res));
                     break;
                 case UPDATE:
-                    res = update(batchOperation.getId(), (Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getEntityPath(), true, null);
+                    res = update(batchOperation.getId(), (Map<String, Object>) batchOperation.getEntityBody(), request, batchOperation.getAdditionalData(), batchOperation.getRefreshSavedEntity(), batchOperation.getEntityPath(), true, null);
                     //batchOperation.setEntityBody(objectMapper.convertValue(res, Map.class));
                     projectionsInterceptorLauncher.setRequestParams(batchOperation.getAdditionalData(), request);
                     batchOperation.setEntityBody(factory.createProjection(projectionClass, res));

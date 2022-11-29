@@ -15,17 +15,19 @@ public class BatchOperation {
     private String returnProjection;
     private Object entityBody;
     private Map<String, String> additionalData;
+    private Boolean refreshSavedEntity = false;
 
     public BatchOperation() {
     }
 
-    public BatchOperation(Operations operation, Object id, String entityPath, String returnProjection, Map<String, Object> entityBody, Map<String, String> additionalData) {
+    public BatchOperation(Operations operation, Object id, String entityPath, String returnProjection, Map<String, Object> entityBody, Map<String, String> additionalData, Boolean refreshSavedEntity) {
         this.operation = operation;
         this.id = id;
         this.entityPath = entityPath;
         this.returnProjection = returnProjection;
         this.entityBody = entityBody;
         this.additionalData = additionalData;
+        this.refreshSavedEntity = refreshSavedEntity;
     }
 
     public Operations getOperation() {
@@ -76,5 +78,13 @@ public class BatchOperation {
 
     public void setAdditionalData(Map<String, String> additionalData) {
         this.additionalData = additionalData;
+    }
+
+    public Boolean getRefreshSavedEntity() {
+        return refreshSavedEntity;
+    }
+
+    public void setRefreshSavedEntity(Boolean refreshSavedEntity) {
+        this.refreshSavedEntity = refreshSavedEntity;
     }
 }
