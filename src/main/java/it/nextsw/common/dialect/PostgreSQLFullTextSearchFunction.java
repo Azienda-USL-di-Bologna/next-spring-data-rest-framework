@@ -47,9 +47,6 @@ public class PostgreSQLFullTextSearchFunction implements SQLFunction {
                     .replace("@", " ")
                     .replace(".", " ");
             
-            // al posto degli spazi metto le & per fare la ricerca in and e :* per trovare anche le parole che hanno la stringa come radice
-            value = value.trim().replaceAll("\\s+", ":*&");
-            
             // faccio l'escape dei caratteri speciali
             value = value
                     .replace("\\", "\\\\")
@@ -62,6 +59,9 @@ public class PostgreSQLFullTextSearchFunction implements SQLFunction {
                     .replace(")", "\\)")
                     .replace("+", "\\+")
                     .replace("<", "\\<");
+            
+            // al posto degli spazi metto le & per fare la ricerca in and e :* per trovare anche le parole che hanno la stringa come radice
+            value = value.trim().replaceAll("\\s+", ":*&");
         }
         if (value.trim().isEmpty()) {
             value = "\\";

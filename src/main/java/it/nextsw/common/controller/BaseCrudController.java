@@ -32,9 +32,10 @@ public abstract class BaseCrudController {
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
+            @RequestParam(required = false, name = "additionalData") String additionalData,
+            @RequestParam(required = false, name = "refreshSavedEntity", defaultValue = "false") Boolean refreshSavedEntity) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
-        Object entity = getRestControllerEngine().insert(data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
+        Object entity = getRestControllerEngine().insert(data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), refreshSavedEntity, null, false, projection);
         return new ResponseEntity(entity, HttpStatus.CREATED);
     }
 
@@ -45,10 +46,11 @@ public abstract class BaseCrudController {
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
+            @RequestParam(required = false, name = "additionalData") String additionalData,
+            @RequestParam(required = false, name = "refreshSavedEntity", defaultValue = "false") Boolean refreshSavedEntity) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing update operation...");
         try {
-            Object update = getRestControllerEngine().update(id, data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), null, false, projection);
+            Object update = getRestControllerEngine().update(id, data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), refreshSavedEntity, null, false, projection);
             return new ResponseEntity(update, HttpStatus.OK);
         } catch (NotFoundResourceException ex) {
             return new ResponseEntity(ex.getMessage(), HttpStatus.NOT_FOUND);
