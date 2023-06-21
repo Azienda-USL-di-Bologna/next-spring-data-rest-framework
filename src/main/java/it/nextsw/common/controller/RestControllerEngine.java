@@ -833,7 +833,9 @@ public abstract class RestControllerEngine {
                             && !StringUtils.isEmpty(value)
                             && isJsonParsable(value)
                             && !StringUtils.isEmpty(valueEntity)
-                            && isJsonParsable(valueEntity)) {
+                            && isJsonParsable(valueEntity)
+                            && isJsonField(field)
+                            ) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
@@ -1584,5 +1586,10 @@ public abstract class RestControllerEngine {
                 break;
             }
         }
+    }
+
+    private boolean isJsonField(Field field) {
+        String columnDefinition = field.getAnnotation(javax.persistence.Column.class).columnDefinition();
+        return columnDefinition.equalsIgnoreCase("json") || columnDefinition.equalsIgnoreCase("jsonb");
     }
 }
