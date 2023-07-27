@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.EntityPath;
 import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.ArrayPath;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -12,13 +13,16 @@ import com.querydsl.core.types.dsl.BooleanTemplate;
 import com.querydsl.core.types.dsl.DatePath;
 import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.ListPath;
 import com.querydsl.core.types.dsl.NumberPath;
+import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.core.types.dsl.StringPath;
 import it.nextsw.common.controller.HibernateEntityInterceptor;
 import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -56,10 +60,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
    public Page<T> findAllNoCount(Predicate predicate, Pageable pageable);
     
     /**
-     * per generare il Q per fare i filtri, si istanzia un oggetto del campo di
-     * ricerca. Implemetando il metodo customize ci si gestisce i filtri come si
-     * vuole.
-     *
+     * per generare il Q per fare i filtri, si istanzia un oggetto del campo di ricerca. Implemetando il metodo customize ci si gestisce i filtri come si vuole.
      *
      * @param bindings
      * @param entityPath
@@ -74,6 +75,90 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             filterDescriptorMapaz = new HashMap();
             NextSdrControllerInterceptor.filterDescriptor.set(filterDescriptorMapaz);
         }
+        
+        /*
+        bisogna gestire i campi ti tipo jsonb che sono gestiti tramite oggetto AbstractJsonType
+        Per farlo ciclo su tutti i campi dell'entità e se be trovo gli bindo la funzione per poter generare l'sql corretto per fare la query
+        TODO: ora gestisce solo i campi di tipo lista si AbstractJsonType, vanno gestiti anche i campi non liste
+        */
+        
+        // estrare tutti i campi
+        Field[] fields = entityPath.getType().getDeclaredFields();
+        
+        for (Field field : fields) {
+            // imposta i campi accessibili (anche se sono privati)
+            field.setAccessible(true);
+            Class<?> fieldType = field.getType();
+
+            // se il campo è di tipo collection (la lista è uan collection)
+            if (Collection.class.isAssignableFrom(fieldType)) {
+                ParameterizedType parameterizedType = (ParameterizedType) field.getGenericType();
+                Class<?> genericType = (Class<?>) parameterizedType.getActualTypeArguments()[0];
+
+                // se la lista è di tipo AbstractJsonType (per la precisione di tipo classe che estende AbstractJsonType)
+                if (AbstractJsonType.class.isAssignableFrom(genericType)) {
+                    
+                    // creo l'oggetto che rappresenta il path querydsl (quello dell'oggetto Q, es: QdocDetail.docDetail.firmatari)
+                    PathMetadata metadata = entityPath.getMetadata();
+                    PathBuilder<Object> fieldPathBuilder = new PathBuilder(entityPath.getType(), metadata);
+                    ListPath listPath = fieldPathBuilder.getList(field.getName(), genericType, Path.class);
+
+                    // bindo al path la funzione che genera l'sql corretto per fare i filti
+                    bindings.bind(listPath).all((
+                            Path path, // il path sul quale si è bindati
+                            Collection values // il valore che è stato passato come filtro. 
+                            // E' una collection perché lo stesso campo può essere passatto più volte nella query string nel caso si voglia fare un or
+                    ) -> {
+                        Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+
+                        /*
+                        contiene la lista degli oggetti (che son delel liste di un solo elemento il quale contiene l'oggetto AbstractJsonTypeForQueryDslExecutor 
+                        che rappresenta il filtro json passati nella query string
+                        */
+                        ArrayList filterValuesList = new ArrayList(values);
+                        filterDescriptorMap.put(path, filterValuesList);
+
+                        Predicate res;
+                        try {
+                            // se per caso non è stato passato nessun valore non applico filtri (questo caso non sdovrebbe mai succedere)
+                            if (values.isEmpty()) {
+                                res = Expressions.asBoolean(true).isTrue();
+                            } else {
+                                // altrimenti, prima mi assicuro che nell'entità la colonna sia definita come jsonb e poi creo la prima condizione per la where condition
+                                String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                                if (columDefinition != null && columDefinition.contains("jsonb")) {
+                                    // estraggo l'oggetto AbstractJsonTypeForQueryDslExecutor che rappresenta il json di filtro e creo l'sql per la condizione di filtro
+                                    AbstractJsonTypeForQueryDslExecutor filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor)((List)filterValuesList.get(0)).get(0);
+                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                                        String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", filterJsonQuery.toJsonString()),
+                                        path
+                                    );
+                                    
+                                    // se è stato passato lo stesso campo più volte (per fare un or) aggiungo la condizione in or
+                                    if (values.size() > 1) {
+                                        for (int i = 1; i < filterValuesList.size(); i++) {
+                                            filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor)((List)filterValuesList.get(i)).get(0);
+                                            booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
+                                                    String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", filterJsonQuery.toJsonString()),
+                                                    path)));
+                                        }
+                                    }
+
+                                    res = booleanTemplate;
+                                }  else { // se sull'entità la colonna non è definita come tipo jsonb non applico il filtro, per non avere errori nella query
+                                    res = Expressions.asBoolean(true).isTrue();
+                                }
+                            }
+                            return Optional.of(res);
+
+                        } catch (Exception ex) {
+                            return Optional.of(Expressions.asBoolean(true).isTrue());
+                        }
+                    });
+                }
+            }
+        }
+        
         
         bindings.bind(Boolean.class).all((final Path<Boolean> path, final Collection<? extends Boolean> values) -> {
             
