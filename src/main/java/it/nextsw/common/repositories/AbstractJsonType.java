@@ -15,8 +15,12 @@ import java.lang.reflect.Field;
     use = JsonTypeInfo.Id.CLASS, visible = true, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "classz", defaultImpl = AbstractJsonTypeForQueryDslExecutor.class)
 public abstract class AbstractJsonType {
     
-    public String classz;
+    public String classz = getClass().getName();
 
+    protected AbstractJsonType(){
+        this.classz = getClass().getName();
+    }
+    
     public String getClassz() {
         return classz;
     }
