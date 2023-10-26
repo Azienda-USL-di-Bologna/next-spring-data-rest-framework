@@ -32,7 +32,7 @@ public abstract class BaseCrudController {
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData,
+            @RequestParam(required = false, name = "$additionalData") String additionalData,
             @RequestParam(required = false, name = "refreshSavedEntity", defaultValue = "false") Boolean refreshSavedEntity) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing insert operation...");
         Object entity = getRestControllerEngine().insert(data, request, getRestControllerEngine().parseAdditionalDataIntoMap(additionalData), refreshSavedEntity, null, false, projection);
@@ -46,7 +46,7 @@ public abstract class BaseCrudController {
             @RequestBody Map<String, Object> data,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData,
+            @RequestParam(required = false, name = "$additionalData") String additionalData,
             @RequestParam(required = false, name = "refreshSavedEntity", defaultValue = "false") Boolean refreshSavedEntity) throws RestControllerEngineException, AbortSaveInterceptorException {
         log.info("executing update operation...");
         try {
@@ -63,7 +63,7 @@ public abstract class BaseCrudController {
             @PathVariable(required = true) Object id,
             HttpServletRequest request,
             @RequestParam(required = false) String projection,
-            @RequestParam(required = false, name = "additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
+            @RequestParam(required = false, name = "$additionalData") String additionalData) throws RestControllerEngineException, AbortSaveInterceptorException {
 
         log.info("executing delete operation...");
 
