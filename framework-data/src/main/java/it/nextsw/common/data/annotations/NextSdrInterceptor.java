@@ -1,4 +1,4 @@
-package it.nextsw.common.annotations;
+package it.nextsw.common.data.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

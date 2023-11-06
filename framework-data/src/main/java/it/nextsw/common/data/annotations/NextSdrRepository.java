@@ -1,6 +1,4 @@
-package it.nextsw.common.annotations;
-
-import it.nextsw.common.repositories.NextSdrQueryDslRepository;
+package it.nextsw.common.data.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
