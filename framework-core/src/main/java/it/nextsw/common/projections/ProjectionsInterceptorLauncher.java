@@ -100,7 +100,11 @@ public class ProjectionsInterceptorLauncher {
     }
     public Object lanciaInterceptor(Object target, String methodName, String projectionToUse) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException {
 //        Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(returnType); // Recupero la classe che sto espandendo dalla sua ProxyClass
-
+        // threadLocalParams.get() può essere null nel caso in cui non si passa da una richiesta del framework, in questo caso, facendo questo controllo, evitiamo di avere un nullpointer
+        // NB: Se possibile è comunque opportuno richiamare il metodo setRequestParams di questo bean (es projectionsInterceptorLauncher.setRequestParams(null, request); per passare la request)
+        if (threadLocalParams.get() == null) {
+            setRequestParams(null, null);
+        }
         Method method = target.getClass().getMethod(methodName);    // Recupero il metodo che sto gestendo (quello su cui c'è l'annotazione)
         Class entityFromProxyClass = EntityReflectionUtils.getEntityFromProxyClass(method.getReturnType()); // Recupero la classe che sto espandendo dalla sua ProxyClass
         Object invoke = method.invoke(target);                      // Eseguo il metodo sull'istanza dell'entità di partenza in modo da recuperare l'entità da espandere (In realtà l'esecuzione del metodo non esegue la query ma torna l'istanza dell'entità con popolato solo l'id)
@@ -220,6 +224,12 @@ public class ProjectionsInterceptorLauncher {
     }
     
     public Collection lanciaInterceptorCollection(Object target, String methodName, String projectionToUse, Sort sort) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchFieldException, InterceptorException, AbortLoadInterceptorException {
+        // threadLocalParams.get() può essere null nel caso in cui non si passa da una richiesta del framework, in questo caso, facendo questo controllo, evitiamo di avere un nullpointer
+        // NB: Se possibile è comunque opportuno richiamare il metodo setRequestParams di questo bean (es projectionsInterceptorLauncher.setRequestParams(null, request); per passare la request)
+        if (threadLocalParams.get() == null) {
+            setRequestParams(null, null);
+        }
+        
         Class targetEntityClass = EntityReflectionUtils.getEntityFromProxyObject(target);
         Method method = targetEntityClass.getMethod(methodName);
         // Come returnType voglio il tipo dell'entità all'interno del Set/List. Per trovarlo bisogna castare a ParameterizedType il risultato di getGenericReturnType() sul metodo trattato.
