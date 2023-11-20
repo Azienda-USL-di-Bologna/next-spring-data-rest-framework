@@ -1,6 +1,6 @@
 package it.nextsw.common.persistence.repository;
 
-import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.data.annotations.NextSdrRepository;
 import it.nextsw.common.persistence.entities.Agente;
 import it.nextsw.common.persistence.entities.QAgente;
 import it.nextsw.common.persistence.entities.projections.AgenteProjection;
