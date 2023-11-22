@@ -18,6 +18,7 @@ import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.core.types.dsl.StringPath;
 import it.nextsw.common.controller.HibernateEntityInterceptor;
+import it.nextsw.common.data.annotations.NextSdrCustomColumnDefinition;
 import it.nextsw.common.data.types.AbstractJsonType;
 import it.nextsw.common.data.types.AbstractJsonTypeForQueryDslExecutor;
 import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
@@ -479,6 +480,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     
                     Predicate res;
                     String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                    NextSdrCustomColumnDefinition customColumnDefinitionAnnotation = path.getAnnotatedElement().getAnnotation(NextSdrCustomColumnDefinition.class);
+                    if (customColumnDefinitionAnnotation != null) {
+                        columDefinition = customColumnDefinitionAnnotation.name();
+                    }
                     if (columDefinition != null && columDefinition.equalsIgnoreCase("integer[]")) {
                         BooleanBuilder b = new BooleanBuilder();
                         BooleanExpression expression;
@@ -497,6 +502,14 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                 );
                             }
                             b = b.or(expression);
+                        }
+                        res = b;
+                    } else if (columDefinition != null && columDefinition.equalsIgnoreCase("bit")) {
+                        // Si vuole fare l'AND bit a bit
+                        BooleanBuilder b = new BooleanBuilder();
+                        for (Object valueObj : values) {
+                            Integer value = (Integer) valueObj;
+                            b = b.or(Expressions.numberTemplate(Integer.class, "function('bitand', {0}, {1})", path, value).gt(0));
                         }
                         res = b;
                     } else {
