@@ -2,7 +2,7 @@ package it.nextsw.common.interceptors;
 
 import com.querydsl.core.types.Path;
 import com.querydsl.core.types.Predicate;
-import it.nextsw.common.annotations.NextSdrInterceptor;
+import it.nextsw.common.data.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.BeforeUpdateEntityApplier;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;

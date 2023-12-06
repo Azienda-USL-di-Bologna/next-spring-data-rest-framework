@@ -1,6 +1,6 @@
 package it.nextsw.common.persistence.repository;
 
-import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.data.annotations.NextSdrRepository;
 import it.nextsw.common.persistence.entities.QSettoreOperativo;
 import it.nextsw.common.persistence.entities.SettoreOperativo;
 import it.nextsw.common.persistence.entities.projections.SettoreOperativoProjection;

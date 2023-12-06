@@ -1,7 +1,7 @@
 package it.nextsw.common.utils;
 
 import com.google.common.base.CaseFormat;
-import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.data.annotations.NextSdrRepository;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;

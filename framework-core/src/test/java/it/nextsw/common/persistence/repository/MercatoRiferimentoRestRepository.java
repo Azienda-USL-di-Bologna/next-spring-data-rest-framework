@@ -1,6 +1,6 @@
 package it.nextsw.common.persistence.repository;
 
-import it.nextsw.common.annotations.NextSdrRepository;
+import it.nextsw.common.data.annotations.NextSdrRepository;
 import it.nextsw.common.persistence.entities.MercatoRiferimento;
 import it.nextsw.common.persistence.entities.QMercatoRiferimento;
 import it.nextsw.common.persistence.entities.projections.MercatoRiferimentoProjection;
