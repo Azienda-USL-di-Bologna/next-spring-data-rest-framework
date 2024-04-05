@@ -757,7 +757,9 @@ public abstract class RestControllerEngine {
                         } catch (Exception ex) {
                             // solo giorno
                             //dateTime = LocalDate.parse(value.toString(), format).atStartOfDay();
-                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                            //commentata perché non capiamo a cosa serva, probabilmente un errore: si voleva fare come la riga sotto
+                            //dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).atStartOfDay();
+                            dateTime = LocalDate.parse(value.toString(), DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay();
                         }
                         if (!dateTime.equals(valueEntity)) {
                             return true;
