@@ -2,7 +2,6 @@ package it.nextsw.common.dialect;
 
 import java.util.List;
 import org.hibernate.QueryException;
-import org.hibernate.dialect.function.SQLFunction;
 import org.hibernate.engine.spi.Mapping;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.type.StandardBasicTypes;
