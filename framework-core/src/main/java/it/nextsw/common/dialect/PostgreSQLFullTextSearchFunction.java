@@ -4,6 +4,7 @@ import java.util.List;
 import org.hibernate.QueryException;
 import org.hibernate.engine.spi.Mapping;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
+import org.hibernate.type.BasicTypeReference;
 import org.hibernate.type.StandardBasicTypes;
 import org.hibernate.type.Type;
 
@@ -27,7 +28,7 @@ public class PostgreSQLFullTextSearchFunction implements SQLFunction {
     }
 
     @Override
-    public Type getReturnType(Type firstArgumentType, Mapping mapping) throws QueryException {
+    public BasicTypeReference<Boolean> getReturnType(Type firstArgumentType, Mapping mapping) throws QueryException {
         return StandardBasicTypes.BOOLEAN;
     }
 

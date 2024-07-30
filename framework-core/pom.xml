@@ -6,11 +6,6 @@
     <artifactId>next-spring-data-rest-framework-core</artifactId>
     <version>2.0.0</version>
     <packaging>jar</packaging>
-    <!--    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.6.12</version>
-    </parent>-->
     <parent>
         <groupId>it.nextsw.common</groupId>
         <artifactId>next-spring-data-rest-framework</artifactId>
@@ -86,11 +81,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-rest</artifactId>
+            <version>3.3.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <version>3.3.2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -110,6 +107,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <version>3.3.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -125,13 +123,19 @@
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-reload4j</artifactId>
+            <artifactId>slf4j-log4j12</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
+            <version>3.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>6.1.11</version>
+            <type>jar</type>
         </dependency>
     </dependencies>
     <build>
@@ -146,7 +150,6 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.6.1</version>
                 <configuration>
-                    <!-- or whatever version you use -->
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <debug>true</debug>
@@ -159,9 +162,6 @@
                 <executions>
                     <execution>
                         <id>${project.artifactId}</id>
-                        <!--                        <goals>
-                            <goal>jar</goal>
-                        </goals>-->
                         <phase>package</phase>
                     </execution>
                 </executions>
@@ -194,7 +194,6 @@
                             <goal>jar</goal>
                         </goals>
                     </execution>
-
                 </executions>
             </plugin>
             <plugin>
@@ -227,9 +226,6 @@
                         <configuration>
                             <outputDirectory>target/generated-test-sources/java</outputDirectory>
                             <processor>com.querydsl.apt.jpa.JPAAnnotationProcessor</processor>
-                            <!--<includes>-->
-                            <!--<include>it.nextsw.common.persistence.entitieses.**</include>-->
-                            <!--</includes>-->
                         </configuration>
                     </execution>
                 </executions>
