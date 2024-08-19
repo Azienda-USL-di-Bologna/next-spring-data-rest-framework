@@ -14,10 +14,11 @@ import org.springframework.stereotype.Component;
 public class MyInterceptorRegistration implements HibernatePropertiesCustomizer {
 
     @Autowired
-    private HibernateEntityInterceptor myInterceptor;
+    private HibernateEntityInspector myInspector;
 
     @Override
     public void customize(Map<String, Object> hibernateProperties) {
-        hibernateProperties.put("hibernate.session_factory.interceptor", myInterceptor);
+//        hibernateProperties.put("hibernate.session_factory.interceptor", myInterceptor);
+        hibernateProperties.put("hibernate.session_factory.statement_inspector", myInspector);
     }
 }

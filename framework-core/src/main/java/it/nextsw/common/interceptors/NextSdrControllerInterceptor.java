@@ -11,7 +11,7 @@ import it.nextsw.common.interceptors.exceptions.SkipDeleteInterceptorException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  *  L'interfaccia di base per gli interceptor, tutti gli interceptor devono implementarla

@@ -1,7 +1,7 @@
 package it.nextsw.common.interceptors;
 
 import it.nextsw.common.controller.BeforeUpdateEntityApplier;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 
 public class InterceptorParameters {

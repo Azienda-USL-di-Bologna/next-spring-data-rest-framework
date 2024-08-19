@@ -3,8 +3,8 @@ package it.nextsw.common.rest;
 import it.nextsw.common.controller.RestControllerEngine;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 
 @Service

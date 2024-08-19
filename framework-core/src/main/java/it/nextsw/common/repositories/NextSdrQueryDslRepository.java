@@ -17,7 +17,7 @@ import com.querydsl.core.types.dsl.ListPath;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.core.types.dsl.StringPath;
-import it.nextsw.common.controller.HibernateEntityInterceptor;
+import it.nextsw.common.controller.HibernateEntityInspector;
 import it.nextsw.common.data.annotations.NextSdrCustomColumnDefinition;
 import it.nextsw.common.data.types.AbstractJsonType;
 import it.nextsw.common.data.types.AbstractJsonTypeForQueryDslExecutor;
@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.persistence.Column;
+import jakarta.persistence.Column;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
@@ -354,8 +354,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             return null; //To change body of generated lambdas, choose Tools | Templates.
         });
 
-        bindings.bind(String.class).all(
-                (Path<String> path, Collection<? extends String> values) -> {
+        bindings.bind(String.class).all((Path<String> path, Collection<? extends String> values) -> {
                     final List<? extends Object> strings = new ArrayList<>(values);
                     
                     Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
@@ -379,10 +378,10 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
                                         path
                                 );
-                                Map<String, String> rankQueryMap = HibernateEntityInterceptor.rankQueryObj.get();
+                                Map<String, String> rankQueryMap = HibernateEntityInspector.rankQueryObj.get();
                                 if (rankQueryMap == null) {
                                     rankQueryMap = new HashMap();
-                                    HibernateEntityInterceptor.rankQueryObj.set(rankQueryMap);
+                                    HibernateEntityInspector.rankQueryObj.set(rankQueryMap);
                                 }
                                 AnnotatedElement annotatedElement = path.getAnnotatedElement();
                                 String buildingRankQuery = (String) strings.get(0);
