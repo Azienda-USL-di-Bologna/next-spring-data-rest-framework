@@ -162,7 +162,9 @@ public abstract class RestControllerEngine {
      * @param data - dati grezzi passati nella richiesta
      * @param request
      * @param additionalData
-     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db
+     * dopo il suo salvataggio (utile ad esempio che i campi modificati dai
+     * trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -226,7 +228,7 @@ public abstract class RestControllerEngine {
                     }
                 }
             }
-            
+
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
             }
@@ -249,7 +251,7 @@ public abstract class RestControllerEngine {
 
             // salvataggio dell'entità
             generalRepository.save(entity);
-            if (refreshSavedEntity) {                
+            if (refreshSavedEntity) {
                 em.refresh(entity);
             }
 
@@ -271,6 +273,8 @@ public abstract class RestControllerEngine {
                 entity = factory.createProjection(projectionClass, entity);
             }
             return entity;
+        } catch (AbortSaveInterceptorException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
         }
@@ -343,7 +347,9 @@ public abstract class RestControllerEngine {
      * @param data
      * @param request
      * @param additionalData
-     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db
+     * dopo il suo salvataggio (utile ad esempio che i campi modificati dai
+     * trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -385,15 +391,15 @@ public abstract class RestControllerEngine {
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
                 res = merge(data, entity, request, additionalData, new ArrayList(), projectionClass, null);
-                
+
                 if (!batch) {
                     projectionsInterceptorLauncher.setRequestParams(additionalData, request);
                 }
-                
+
                 restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
-                if (refreshSavedEntity) {                
+                if (refreshSavedEntity) {
                     em.refresh(res);
                 }
 
@@ -554,7 +560,7 @@ public abstract class RestControllerEngine {
                         entityVersionValue = ((ZonedDateTime) entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
                     }
 
-                    if (!((ZonedDateTime)entityVersionValue).isEqual((ZonedDateTime)value)) {
+                    if (!((ZonedDateTime) entityVersionValue).isEqual((ZonedDateTime) value)) {
                         throw new OptimisticLockException("i campi version non corrispondono");
                     }
                 } else {
@@ -836,8 +842,7 @@ public abstract class RestControllerEngine {
                             && isJsonParsable(value)
                             && !StringUtils.isEmpty(valueEntity)
                             && isJsonParsable(valueEntity)
-                            && isJsonField(field)
-                            ) {
+                            && isJsonField(field)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
