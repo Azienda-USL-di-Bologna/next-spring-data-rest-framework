@@ -343,6 +343,25 @@ public class EntityReflectionUtils {
         } else
             return result;
     }
+    
+    /**
+     * torna il campo identificato dal metodo get o set standard
+     * @param entityClass
+     * @param methodName
+     * @return
+     * @throws EntityReflectionException
+     * @throws NoSuchFieldException 
+     */
+    public static Field getFieldFromGetOrSetMethod(Class entityClass, String methodName) throws EntityReflectionException, NoSuchFieldException  {
+        if (!methodName.startsWith("get") && !methodName.startsWith("set")) {
+            throw new RuntimeException(String.format("il metodo passato %s non iniza con get o set", methodName));
+        }
+        String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, methodName.substring(3, methodName.length()));
+        Class entityFromProxyClass = getEntityFromProxyClass(entityClass);
+        Field field = entityFromProxyClass.getDeclaredField(fieldName);
+        return field;
+    }
+    
 
     /**
      * Il metodo ritorna il field della classe o di una delle sue superclassi

@@ -11,13 +11,14 @@ import org.hibernate.type.spi.TypeConfiguration;
 public class CustomPostgresDialect extends PostgreSQLDialect {
 
     public CustomPostgresDialect() {
+        
         super();
-        this.registerFunction("fts_match", new PostgreSQLFullTextSearchFunction());
-        this.registerFunction("array_operation", new PostgresArrayFunctions());
-        this.registerFunction("bitand", new SQLFunctionTemplate(IntegerType.INSTANCE, "(?1 & ?2)"));
-        this.registerFunction("jsonb_contains", new PostgreSQLJsonbFunction());
-        new PostgreSQLJsonbFunction();
-        this.registerFunction("like", new PostgreSQLLikeFunction());
+//        this.registerFunction("fts_match", new PostgreSQLFullTextSearchFunction());
+//        this.registerFunction("array_operation", new PostgresArrayFunctions());
+//        this.registerFunction("bitand", new SQLFunctionTemplate(IntegerType.INSTANCE, "(?1 & ?2)"));
+//        this.registerFunction("jsonb_contains", new PostgreSQLJsonbFunction());
+//        new PostgreSQLJsonbFunction();
+//        this.registerFunction("like", new PostgreSQLLikeFunction());
     }
 
     @Override
@@ -28,19 +29,14 @@ public class CustomPostgresDialect extends PostgreSQLDialect {
         //BasicTypeRegistry basicTypeRegistry = typeConfiguration.getBasicTypeRegistry();
         
 //        registry.register("fts_match", new PostgreSQLFullTextSearchFunction());
-//        registry.register("array_operation", function);
-//        functionRegistry.register("bitand", function);
         new PatternFunctionDescriptorBuilder(registry, "bitand", FunctionKind.NORMAL, "(?1 & ?2)")
             .setExactArgumentCount(2)
             .setInvariantType(types.getBasicTypeForJavaType(Integer.class))
             .register();
-        new PatternFunctionDescriptorBuilder(registry, "jsonb_contains", FunctionKind.NORMAL, "(?1 & ?2)")
-            .setExactArgumentCount(2)
-            .setInvariantType(types.getBasicTypeForJavaType(Integer.class))
-            .register();
         registry.register("jsonb_contains", new PostgreSQLJsonbFunction("jsonb_contains"));
-//        functionRegistry.register("jsonb_contains", function);
-//        functionRegistry.register("like", function);
+        registry.register("fts_match", new PostgreSQLFullTextSearchFunction("fts_match"));
+        registry.register("like", new PostgreSQLLikeFunction("like"));
+        registry.register("array_operation", new PostgresArrayFunctions("array_operation"));
     }
 
 }

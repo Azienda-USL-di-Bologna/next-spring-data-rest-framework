@@ -81,8 +81,8 @@ public abstract class RestControllerEngine {
     @Autowired
     protected PagedResourcesAssembler<Object> assembler;
 
-    @Autowired
-    protected RepresentationModelAssembler resourceAssembler;
+//    @Autowired
+//    protected RepresentationModelAssembler resourceAssembler;
 
     @Autowired
     protected ObjectMapper objectMapper;
