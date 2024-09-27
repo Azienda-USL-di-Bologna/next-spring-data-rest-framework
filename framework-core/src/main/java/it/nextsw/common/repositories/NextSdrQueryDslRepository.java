@@ -407,7 +407,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                     if (!StringUtils.hasText((String) value[0])) {
                                         ArrayPath arrayPath = (ArrayPath) path;
                                         BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                                "cardinality({0})=0", arrayPath
+                                                "cast(cardinality({0}) as integer)=0", arrayPath
                                         );
                                         expression = arrayPath.isNull().or(arrayIsEmpty);
                                     } else {
@@ -491,7 +491,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             if (value[0] == null) {
                                 ArrayPath arrayPath = (ArrayPath) path;
                                 BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                        "cardinality({0})=0", arrayPath
+                                        "cast(cardinality({0}) as boolean)=0", arrayPath
                                 );
                                 expression = arrayPath.isNull().or(arrayIsEmpty);
                             } else {
