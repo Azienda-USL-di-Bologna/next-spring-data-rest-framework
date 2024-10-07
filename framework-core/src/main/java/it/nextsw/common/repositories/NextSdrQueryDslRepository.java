@@ -412,7 +412,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         expression = arrayPath.isNull().or(arrayIsEmpty);
                                     } else {
                                         expression = Expressions.booleanTemplate(
-                                                String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
+                                                String.format("cast(FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
                                                 path
                                         );
                                     }
@@ -491,12 +491,12 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             if (value[0] == null) {
                                 ArrayPath arrayPath = (ArrayPath) path;
                                 BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                        "cast(cardinality({0}) as boolean)=0", arrayPath
+                                        "cast(cardinality({0}) as integer)=0", arrayPath
                                 );
                                 expression = arrayPath.isNull().or(arrayIsEmpty);
                             } else {
                                 expression = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
+                                        String.format("cast (FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
                                         path
                                 );
                             }
