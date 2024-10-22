@@ -42,11 +42,11 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import javax.persistence.EntityManager;
-import javax.persistence.OneToOne;
-import javax.persistence.OptimisticLockException;
-import javax.persistence.PersistenceContext;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PersistenceContext;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -81,8 +81,8 @@ public abstract class RestControllerEngine {
     @Autowired
     protected PagedResourcesAssembler<Object> assembler;
 
-    @Autowired
-    protected RepresentationModelAssembler resourceAssembler;
+//    @Autowired
+//    protected RepresentationModelAssembler resourceAssembler;
 
     @Autowired
     protected ObjectMapper objectMapper;
@@ -489,8 +489,10 @@ public abstract class RestControllerEngine {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
-                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
-                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
+                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
+                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType"))) {
+//                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
+//                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
                             manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             // TODO: QUesto else if deve assicurarsi di escludere i field json/jsonb. Per il momento è stato messo l'esleif del jsonb sopra a questo.
@@ -1596,7 +1598,7 @@ public abstract class RestControllerEngine {
     }
 
     private boolean isJsonField(Field field) {
-        String columnDefinition = field.getAnnotation(javax.persistence.Column.class).columnDefinition();
+        String columnDefinition = field.getAnnotation(jakarta.persistence.Column.class).columnDefinition();
         return columnDefinition.equalsIgnoreCase("json") || columnDefinition.equalsIgnoreCase("jsonb");
     }
 }

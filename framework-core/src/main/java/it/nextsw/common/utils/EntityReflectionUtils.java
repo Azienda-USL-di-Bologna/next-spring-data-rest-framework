@@ -8,7 +8,7 @@ import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
@@ -101,14 +101,14 @@ public class EntityReflectionUtils {
         java.lang.annotation.Annotation annotation = null;
         Class superclass = classz;
         while (superclass != null && annotation == null) {
-            annotation = superclass.getAnnotation(javax.persistence.Entity.class);
+            annotation = superclass.getAnnotation(jakarta.persistence.Entity.class);
             superclass = superclass.getSuperclass();
         }
         return annotation != null;
     }
 
     public static boolean isEntityClass(Class classz) {
-        java.lang.annotation.Annotation annotation = classz.getAnnotation(javax.persistence.Entity.class);
+        java.lang.annotation.Annotation annotation = classz.getAnnotation(jakarta.persistence.Entity.class);
         return annotation != null;
     }
     
@@ -272,11 +272,11 @@ public class EntityReflectionUtils {
      */
     public static boolean hasOrphanRemoval(Field entityField) {
         try {
-            OneToMany oneToManyAnnotation = entityField.getAnnotation(javax.persistence.OneToMany.class);
+            OneToMany oneToManyAnnotation = entityField.getAnnotation(jakarta.persistence.OneToMany.class);
             if (oneToManyAnnotation != null)
                 return oneToManyAnnotation.orphanRemoval();
             else {
-                OneToOne oneToOneAnnotation = entityField.getAnnotation(javax.persistence.OneToOne.class);
+                OneToOne oneToOneAnnotation = entityField.getAnnotation(jakarta.persistence.OneToOne.class);
                 if (oneToOneAnnotation != null)
                     return oneToOneAnnotation.orphanRemoval();
             }
@@ -343,6 +343,25 @@ public class EntityReflectionUtils {
         } else
             return result;
     }
+    
+    /**
+     * torna il campo identificato dal metodo get o set standard
+     * @param entityClass
+     * @param methodName
+     * @return
+     * @throws EntityReflectionException
+     * @throws NoSuchFieldException 
+     */
+    public static Field getFieldFromGetOrSetMethod(Class entityClass, String methodName) throws EntityReflectionException, NoSuchFieldException  {
+        if (!methodName.startsWith("get") && !methodName.startsWith("set")) {
+            throw new RuntimeException(String.format("il metodo passato %s non iniza con get o set", methodName));
+        }
+        String fieldName = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, methodName.substring(3, methodName.length()));
+        Class entityFromProxyClass = getEntityFromProxyClass(entityClass);
+        Field field = entityFromProxyClass.getDeclaredField(fieldName);
+        return field;
+    }
+    
 
     /**
      * Il metodo ritorna il field della classe o di una delle sue superclassi

@@ -4,12 +4,16 @@ import com.google.common.base.CaseFormat;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.PathBuilder;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import it.nextsw.common.data.annotations.NextSdrCustomOneToOne;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
 import it.nextsw.common.repositories.NextSdrQueryDslRepository;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -21,7 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import java.lang.reflect.Type;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Sort;
@@ -56,6 +61,9 @@ public class ProjectionsInterceptorLauncher {
     @Autowired
     protected ProjectionFactory factory;
 
+    @PersistenceContext
+    protected EntityManager entityManager;
+    
     private static final ThreadLocal<RequestParams> threadLocalParams = new ThreadLocal<>();
 
     private class RequestParams {
@@ -307,6 +315,41 @@ public class ProjectionsInterceptorLauncher {
         }
         return entities;
     }
+    
+    public Object lanciaInterceptorForCustomOneToOne(Object target, String getMethodName) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException, NoSuchFieldException {
+        return lanciaInterceptorForCustomOneToOne(target, getMethodName, null);
+    }
+    
+    public Object lanciaInterceptorForCustomOneToOne(Object target, String getMethodName, String projectionToUse) throws EntityReflectionException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, InterceptorException, AbortLoadInterceptorException, NoSuchFieldException {
+        
+        Class<?> targetClass = target.getClass();
+        Method method = targetClass.getMethod(getMethodName);
+        Type type = method.getAnnotatedReturnType().getType();
+        
+        Field field = EntityReflectionUtils.getFieldFromGetOrSetMethod(targetClass, getMethodName);
+        
+        NextSdrCustomOneToOne customOneToOneAnnotation = field.getAnnotation(NextSdrCustomOneToOne.class);
+        
+        PathBuilder<?> qEntity = new PathBuilder((Class) type, ((Class) type).getSimpleName());//
+        PathBuilder<?> qFk = qEntity.get(customOneToOneAnnotation.mappedBy());//
+        
+        JPAQueryFactory queryFactory = new JPAQueryFactory(entityManager);
+        Object res = queryFactory
+                .select(qEntity)
+                .from(qEntity)
+                .where(qFk.get(EntityReflectionUtils.getPrimaryKeyField(targetClass).getName())
+                        .eq(EntityReflectionUtils.getPrimaryKeyGetMethod(target.getClass()).invoke(target)))
+                .fetchOne();
+        
+//        Optional<Struttura> res = strutturaRepository.findOne(QStruttura.struttura.idContatto.id.eq(target.getId()));
+        if (res != null) {
+            Method setMethod = EntityReflectionUtils.getSetMethod(targetClass, field.getName());
+            setMethod.invoke(target, res);
+            return lanciaInterceptor(target, getMethodName, projectionToUse);
+        } else 
+            return null;
+    }
+    
     
     /**
      * crea un oggetto Sort secondo le proprietà passate

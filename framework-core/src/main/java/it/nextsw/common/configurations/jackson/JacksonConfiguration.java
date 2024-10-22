@@ -19,6 +19,7 @@ public class JacksonConfiguration {
 //        SimpleModule s = new SimpleModule();
 //        s.addDeserializer(ZonedDateTime.class, new ZoneDateTimeDeserializer(ZonedDateTime.class));
         return builder -> builder
+//                .serializerByType(ZonedDateTime.class, new ZoneDateTimeSerializer(ZonedDateTime.class))
                 .deserializerByType(ZonedDateTime.class, new ZoneDateTimeDeserializer(ZonedDateTime.class))
                 .deserializerByType(LocalDateTime.class, new LocalDateTimeDeserializer(LocalDateTime.class))
                 .deserializerByType(LocalDate.class, new LocalDateDeserializer(LocalDate.class));
