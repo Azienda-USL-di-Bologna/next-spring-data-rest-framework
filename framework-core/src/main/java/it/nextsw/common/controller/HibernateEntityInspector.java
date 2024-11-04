@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.hibernate.EmptyInterceptor;
+import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,12 +13,12 @@ import org.springframework.stereotype.Component;
  * @author gusgus
  */
 @Component
-public class HibernateEntityInterceptor extends EmptyInterceptor {
+public class HibernateEntityInspector implements StatementInspector {
     
     public static ThreadLocal<Map<String, String>> rankQueryObj = new ThreadLocal();
 
     @Override
-    public String onPrepareStatement(String sql) {
+    public String inspect(String sql) {
         
 //        System.out.println("ciao gdm non ti arrabbiare");
 //        System.out.println("sql: " + sql);
@@ -50,8 +51,10 @@ public class HibernateEntityInterceptor extends EmptyInterceptor {
             sql = sql.replaceAll(regex, "");
 //            System.out.println("sql cambiato!: " + sql);
         }
+        return sql;
             
-        return super.onPrepareStatement(sql); //To change body of generated methods, choose Tools | Templates.
+//        return super.onPrepareStatement(sql); //To change body of generated methods, choose Tools | Templates.
     }
+
 
 }

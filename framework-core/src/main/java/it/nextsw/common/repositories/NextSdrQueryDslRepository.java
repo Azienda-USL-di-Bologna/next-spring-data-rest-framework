@@ -17,7 +17,7 @@ import com.querydsl.core.types.dsl.ListPath;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.core.types.dsl.StringPath;
-import it.nextsw.common.controller.HibernateEntityInterceptor;
+import it.nextsw.common.controller.HibernateEntityInspector;
 import it.nextsw.common.data.annotations.NextSdrCustomColumnDefinition;
 import it.nextsw.common.data.types.AbstractJsonType;
 import it.nextsw.common.data.types.AbstractJsonTypeForQueryDslExecutor;
@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.persistence.Column;
+import jakarta.persistence.Column;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
@@ -354,8 +354,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             return null; //To change body of generated lambdas, choose Tools | Templates.
         });
 
-        bindings.bind(String.class).all(
-                (Path<String> path, Collection<? extends String> values) -> {
+        bindings.bind(String.class).all((Path<String> path, Collection<? extends String> values) -> {
                     final List<? extends Object> strings = new ArrayList<>(values);
                     
                     Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
@@ -376,13 +375,13 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
                             if (columDefinition != null && columDefinition.contains("tsvector")) {
                                 BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
+                                        String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
                                         path
                                 );
-                                Map<String, String> rankQueryMap = HibernateEntityInterceptor.rankQueryObj.get();
+                                Map<String, String> rankQueryMap = HibernateEntityInspector.rankQueryObj.get();
                                 if (rankQueryMap == null) {
                                     rankQueryMap = new HashMap();
-                                    HibernateEntityInterceptor.rankQueryObj.set(rankQueryMap);
+                                    HibernateEntityInspector.rankQueryObj.set(rankQueryMap);
                                 }
                                 AnnotatedElement annotatedElement = path.getAnnotatedElement();
                                 String buildingRankQuery = (String) strings.get(0);
@@ -390,7 +389,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                 if (values.size() > 1) {
                                     for (int i = 1; i < strings.size(); i++) {
                                         booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
-                                                String.format("FUNCTION('fts_match', italian, {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")), path)));
+                                                String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")), path)));
                                         buildingRankQuery = buildingRankQuery + " " + ((String) strings.get(i));
                                     }
                                 }
@@ -408,12 +407,12 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                     if (!StringUtils.hasText((String) value[0])) {
                                         ArrayPath arrayPath = (ArrayPath) path;
                                         BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                                "cardinality({0})=0", arrayPath
+                                                "cast(cardinality({0}) as integer)=0", arrayPath
                                         );
                                         expression = arrayPath.isNull().or(arrayIsEmpty);
                                     } else {
                                         expression = Expressions.booleanTemplate(
-                                                String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
+                                                String.format("cast(FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
                                                 path
                                         );
                                     }
@@ -492,12 +491,12 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                             if (value[0] == null) {
                                 ArrayPath arrayPath = (ArrayPath) path;
                                 BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                        "cardinality({0})=0", arrayPath
+                                        "cast(cardinality({0}) as integer)=0", arrayPath
                                 );
                                 expression = arrayPath.isNull().or(arrayIsEmpty);
                             } else {
                                 expression = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('array_operation', '%s', '%s', {0}, '%s')= true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
+                                        String.format("cast (FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
                                         path
                                 );
                             }
@@ -615,7 +614,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             res = stringPath.eq(stringOperation.getValue());
         } else {
             res = Expressions.booleanTemplate(
-                String.format("FUNCTION('like', {0}, '%s', %s) = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
+                String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
                 stringPath
             );
         }

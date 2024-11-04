@@ -2,7 +2,7 @@ package it.nextsw.common.persistence.entities;
 
 import org.apache.log4j.Logger;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.io.Serializable;
 
 
