@@ -423,6 +423,27 @@ public abstract class RestControllerEngine {
             throw new RestControllerEngineException("errore nell'update", ex);
         }
     }
+    
+    /**
+     * Torna true se il nome del campo passato è un campo presente sull'entità e questo campo è un campo che potrebbe interessare l'aggiornamento.
+     * Quindi è annotato come Column, OneToMany/ManyToOne/OneToOne/ManyToMany, oppure Version
+     * @param key
+     * @param entityClass
+     * @return 
+     */
+    private boolean isUpdatableField(String key, Class entityClass) {
+        Field field = null;
+        try {
+            field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+        } catch (Exception runtimeException) {
+        }
+        if (field != null) {
+            return EntityReflectionUtils.isColumnOrVersionOrFkField(field);
+        } else {
+            return false;
+        }
+    }
+    
 
     /**
      * Setta i valori presenti nella mappa "data" sull'entità preservando gli
@@ -547,7 +568,10 @@ public abstract class RestControllerEngine {
         if (versionField != null
                 && /* se nell'entità c'è solo il campo chiave primario (oppure solo il campo chiave primario e il campo version) vuol dire
                  * che non sto modificando questa entità, ma al massimo sto cambiando la foreign key sull'entità padre, per cui salto il controllo
-                 */ data.keySet().stream().anyMatch(key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName())))) {
+                 */ 
+                data.keySet().stream().anyMatch(
+                    key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName()) && isUpdatableField(key, entityClass))
+                )) {
             Method getMethod = EntityReflectionUtils.getGetMethod(entityClass, versionField.getName());
             Object entityVersionValue = getMethod.invoke(entity);
             Object value = data.get(versionField.getName());
