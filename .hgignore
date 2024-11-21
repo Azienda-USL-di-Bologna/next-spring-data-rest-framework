@@ -1,7 +1,0 @@
-syntax: glob
-target
-.idea/.name
-.idea
-next-spring-data-rest-framework.iml
-nbactions.xml
-nb-configuration.xml

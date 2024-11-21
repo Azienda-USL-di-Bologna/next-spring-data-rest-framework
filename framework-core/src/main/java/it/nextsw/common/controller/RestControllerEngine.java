@@ -42,11 +42,11 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import javax.persistence.EntityManager;
-import javax.persistence.OneToOne;
-import javax.persistence.OptimisticLockException;
-import javax.persistence.PersistenceContext;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PersistenceContext;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -81,8 +81,8 @@ public abstract class RestControllerEngine {
     @Autowired
     protected PagedResourcesAssembler<Object> assembler;
 
-    @Autowired
-    protected RepresentationModelAssembler resourceAssembler;
+//    @Autowired
+//    protected RepresentationModelAssembler resourceAssembler;
 
     @Autowired
     protected ObjectMapper objectMapper;
@@ -162,7 +162,9 @@ public abstract class RestControllerEngine {
      * @param data - dati grezzi passati nella richiesta
      * @param request
      * @param additionalData
-     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db
+     * dopo il suo salvataggio (utile ad esempio che i campi modificati dai
+     * trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -226,7 +228,7 @@ public abstract class RestControllerEngine {
                     }
                 }
             }
-            
+
             if (!batch) {
                 projectionsInterceptorLauncher.setRequestParams(additionalData, request);
             }
@@ -249,7 +251,7 @@ public abstract class RestControllerEngine {
 
             // salvataggio dell'entità
             generalRepository.save(entity);
-            if (refreshSavedEntity) {                
+            if (refreshSavedEntity) {
                 em.refresh(entity);
             }
 
@@ -271,6 +273,8 @@ public abstract class RestControllerEngine {
                 entity = factory.createProjection(projectionClass, entity);
             }
             return entity;
+        } catch (AbortSaveInterceptorException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RestControllerEngineException("errore nell'inserimento", ex);
         }
@@ -343,7 +347,9 @@ public abstract class RestControllerEngine {
      * @param data
      * @param request
      * @param additionalData
-     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db dopo il suo salvataggio (utile ad esempio che i campi modificati dai trigger)
+     * @param refreshSavedEntity - indica se l'entità verrà ricaricata dal db
+     * dopo il suo salvataggio (utile ad esempio che i campi modificati dai
+     * trigger)
      * @param entityPath opzionale(serve per le operazione batch), se passata
      * viene usata per reperire il repository, altrimenti il repository viene
      * reperito analizzando la request
@@ -385,15 +391,15 @@ public abstract class RestControllerEngine {
 
                 // si effettua il merge sulla classe padre, che andrà in ricorsione anche sulle entità figlie
                 res = merge(data, entity, request, additionalData, new ArrayList(), projectionClass, null);
-                
+
                 if (!batch) {
                     projectionsInterceptorLauncher.setRequestParams(additionalData, request);
                 }
-                
+
                 restControllerInterceptor.executeBeforeUpdateInterceptor(entity, request, additionalData, true, projectionClass);
 
                 generalRepository.save(res);
-                if (refreshSavedEntity) {                
+                if (refreshSavedEntity) {
                     em.refresh(res);
                 }
 
@@ -417,6 +423,27 @@ public abstract class RestControllerEngine {
             throw new RestControllerEngineException("errore nell'update", ex);
         }
     }
+    
+    /**
+     * Torna true se il nome del campo passato è un campo presente sull'entità e questo campo è un campo che potrebbe interessare l'aggiornamento.
+     * Quindi è annotato come Column, OneToMany/ManyToOne/OneToOne/ManyToMany, oppure Version
+     * @param key
+     * @param entityClass
+     * @return 
+     */
+    private boolean isUpdatableField(String key, Class entityClass) {
+        Field field = null;
+        try {
+            field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+        } catch (Exception runtimeException) {
+        }
+        if (field != null) {
+            return EntityReflectionUtils.isColumnOrVersionOrFkField(field);
+        } else {
+            return false;
+        }
+    }
+    
 
     /**
      * Setta i valori presenti nella mappa "data" sull'entità preservando gli
@@ -483,8 +510,10 @@ public abstract class RestControllerEngine {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
-                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
-                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
+                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
+                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType"))) {
+//                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
+//                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
                             manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
                         } else if (Collection.class.isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             // TODO: QUesto else if deve assicurarsi di escludere i field json/jsonb. Per il momento è stato messo l'esleif del jsonb sopra a questo.
@@ -539,7 +568,10 @@ public abstract class RestControllerEngine {
         if (versionField != null
                 && /* se nell'entità c'è solo il campo chiave primario (oppure solo il campo chiave primario e il campo version) vuol dire
                  * che non sto modificando questa entità, ma al massimo sto cambiando la foreign key sull'entità padre, per cui salto il controllo
-                 */ data.keySet().stream().anyMatch(key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName())))) {
+                 */ 
+                data.keySet().stream().anyMatch(
+                    key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName()) && isUpdatableField(key, entityClass))
+                )) {
             Method getMethod = EntityReflectionUtils.getGetMethod(entityClass, versionField.getName());
             Object entityVersionValue = getMethod.invoke(entity);
             Object value = data.get(versionField.getName());
@@ -554,7 +586,7 @@ public abstract class RestControllerEngine {
                         entityVersionValue = ((ZonedDateTime) entityVersionValue).truncatedTo(ChronoUnit.MILLIS);
                     }
 
-                    if (!((ZonedDateTime)entityVersionValue).isEqual((ZonedDateTime)value)) {
+                    if (!((ZonedDateTime) entityVersionValue).isEqual((ZonedDateTime) value)) {
                         throw new OptimisticLockException("i campi version non corrispondono");
                     }
                 } else {
@@ -836,8 +868,7 @@ public abstract class RestControllerEngine {
                             && isJsonParsable(value)
                             && !StringUtils.isEmpty(valueEntity)
                             && isJsonParsable(valueEntity)
-                            && isJsonField(field)
-                            ) {
+                            && isJsonField(field)) {
                         if (!objectMapper.readTree((String) value).equals(objectMapper.readTree((String) valueEntity))) {
                             return true;
                         }
@@ -1591,7 +1622,7 @@ public abstract class RestControllerEngine {
     }
 
     private boolean isJsonField(Field field) {
-        String columnDefinition = field.getAnnotation(javax.persistence.Column.class).columnDefinition();
+        String columnDefinition = field.getAnnotation(jakarta.persistence.Column.class).columnDefinition();
         return columnDefinition.equalsIgnoreCase("json") || columnDefinition.equalsIgnoreCase("jsonb");
     }
 }
