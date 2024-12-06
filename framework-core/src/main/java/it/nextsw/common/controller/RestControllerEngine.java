@@ -800,7 +800,7 @@ public abstract class RestControllerEngine {
                     } else if (ZonedDateTime.class.isAssignableFrom(valueEntityClass)) {
                         ZonedDateTime zonedDateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
                         valueEntity = ((ZonedDateTime) valueEntity).truncatedTo(ChronoUnit.MILLIS);
-                        if (!zonedDateTime.equals(valueEntity)) {
+                        if (!zonedDateTime.isEqual((ZonedDateTime)valueEntity)) {
                             return true;
                         }
                     } else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
