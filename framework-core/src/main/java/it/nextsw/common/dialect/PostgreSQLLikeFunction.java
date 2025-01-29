@@ -92,6 +92,7 @@ public class PostgreSQLLikeFunction extends StandardSQLFunction {
         
         Literal valueLiteral = (Literal) valueArgument;
         String value = (String) valueLiteral.getLiteralValue();
+        value = value.replace("'", "''");
         
         Literal operationLiteral = (Literal) operationArgument;
         String operation = (String) operationLiteral.getLiteralValue();
