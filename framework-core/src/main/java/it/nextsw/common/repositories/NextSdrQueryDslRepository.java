@@ -614,6 +614,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             res = stringPath.eq(stringOperation.getValue());
         } else {
             res = Expressions.booleanTemplate(
+//                String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue(), stringOperation.getOperator().toString()),
                 String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
                 stringPath
             );
