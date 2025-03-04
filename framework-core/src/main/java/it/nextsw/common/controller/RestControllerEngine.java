@@ -50,6 +50,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.hibernate.type.SqlTypes;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -510,8 +511,16 @@ public abstract class RestControllerEngine {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
-                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
-                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType"))) {
+                        } else if (
+                                field.getAnnotation(org.hibernate.annotations.Type.class) != null 
+                                && (
+                                    ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
+                                    || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType")
+                                ) || (
+                                field.getAnnotation(org.hibernate.annotations.JdbcTypeCode.class) != null && 
+                                    ((org.hibernate.annotations.JdbcTypeCode) field.getAnnotation(org.hibernate.annotations.JdbcTypeCode.class)).value() == SqlTypes.JSON))
+//                            @JdbcTypeCode(SqlTypes.JSON)
+                                 {
 //                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
 //                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
                             manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
