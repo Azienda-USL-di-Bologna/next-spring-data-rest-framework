@@ -57,11 +57,11 @@ import org.springframework.util.StringUtils;
  * @param <T>
  */
 public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, T extends EntityPath<?>>
-        extends QuerydslBinderCustomizer<T>,
-        QuerydslPredicateExecutor<E> {
+    extends QuerydslBinderCustomizer<T>,
+    QuerydslPredicateExecutor<E> {
 
-   public Page<T> findAllNoCount(Predicate predicate, Pageable pageable);
-    
+    public Page<T> findAllNoCount(Predicate predicate, Pageable pageable);
+
     /**
      * per generare il Q per fare i filtri, si istanzia un oggetto del campo di ricerca. Implemetando il metodo customize ci si gestisce i filtri come si vuole.
      *
@@ -71,23 +71,22 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
     @Override
     @Nullable
     default void customize(QuerydslBindings bindings, T entityPath) {
-        
+
         NextSdrControllerInterceptor.filterDescriptor.remove(); // Mi assicuro di reinizializzare la varibaile threadlocal
         Map<Path<?>, List<Object>> filterDescriptorMapaz = NextSdrControllerInterceptor.filterDescriptor.get();
         if (filterDescriptorMapaz == null) {
             filterDescriptorMapaz = new HashMap();
             NextSdrControllerInterceptor.filterDescriptor.set(filterDescriptorMapaz);
         }
-        
+
         /*
         bisogna gestire i campi ti tipo jsonb che sono gestiti tramite oggetto AbstractJsonType
         Per farlo ciclo su tutti i campi dell'entità e se be trovo gli bindo la funzione per poter generare l'sql corretto per fare la query
         TODO: ora gestisce solo i campi di tipo lista si AbstractJsonType, vanno gestiti anche i campi non liste
-        */
-        
+         */
         // estrare tutti i campi
         Field[] fields = entityPath.getType().getDeclaredFields();
-        
+
         for (Field field : fields) {
             // imposta i campi accessibili (anche se sono privati)
             field.setAccessible(true);
@@ -109,16 +108,16 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
 
                         // bindo al path la funzione che genera l'sql corretto per fare i filti
                         bindings.bind(listPath).all((
-                                Path path, // il path sul quale si è bindati
-                                Collection values // il valore che è stato passato come filtro. 
-                                // E' una collection perché lo stesso campo può essere passatto più volte nella query string nel caso si voglia fare un or
+                            Path path, // il path sul quale si è bindati
+                            Collection values // il valore che è stato passato come filtro.
+                        // E' una collection perché lo stesso campo può essere passatto più volte nella query string nel caso si voglia fare un or
                         ) -> {
                             Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
 
                             /*
-                            contiene la lista degli oggetti (che son delel liste di un solo elemento il quale contiene l'oggetto AbstractJsonTypeForQueryDslExecutor 
+                            contiene la lista degli oggetti (che son delel liste di un solo elemento il quale contiene l'oggetto AbstractJsonTypeForQueryDslExecutor
                             che rappresenta il filtro json passati nella query string
-                            */
+                             */
                             ArrayList filterValuesList = new ArrayList(values);
                             filterDescriptorMap.put(path, filterValuesList);
 
@@ -132,7 +131,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                     String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
                                     if (columDefinition != null && columDefinition.contains("jsonb")) {
                                         // estraggo l'oggetto AbstractJsonTypeForQueryDslExecutor che rappresenta il json di filtro e creo l'sql per la condizione di filtro
-                                        AbstractJsonTypeForQueryDslExecutor filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor)((List)filterValuesList.get(0)).get(0);
+                                        AbstractJsonTypeForQueryDslExecutor filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor) ((List) filterValuesList.get(0)).get(0);
                                         BooleanExpression booleanTemplate = Expressions.booleanTemplate(
                                             String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", filterJsonQuery.toJsonString()),
                                             path
@@ -141,15 +140,15 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                                         // se è stato passato lo stesso campo più volte (per fare un or) aggiungo la condizione in or
                                         if (values.size() > 1) {
                                             for (int i = 1; i < filterValuesList.size(); i++) {
-                                                filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor)((List)filterValuesList.get(i)).get(0);
+                                                filterJsonQuery = (AbstractJsonTypeForQueryDslExecutor) ((List) filterValuesList.get(i)).get(0);
                                                 booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
-                                                        String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", filterJsonQuery.toJsonString()),
-                                                        path)));
+                                                    String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", filterJsonQuery.toJsonString()),
+                                                    path)));
                                             }
                                         }
 
                                         res = booleanTemplate;
-                                    }  else { // se sull'entità la colonna non è definita come tipo jsonb non applico il filtro, per non avere errori nella query
+                                    } else { // se sull'entità la colonna non è definita come tipo jsonb non applico il filtro, per non avere errori nella query
                                         res = Expressions.asBoolean(true).isTrue();
                                     }
                                 }
@@ -163,18 +162,17 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                 }
             }
         }
-        
-        
+
         bindings.bind(Boolean.class).all((final Path<Boolean> path, final Collection<? extends Boolean> values) -> {
-            
+
             Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
             filterDescriptorMap.put(path, new ArrayList(values));
- 
+
             final List<? extends Boolean> booleans = new ArrayList<>(values);
             Predicate res;
-            
+
             BooleanPath booleanPath = (BooleanPath) path;
-            
+
             if (values.isEmpty()) {
                 res = Expressions.asBoolean(true).isTrue();
             } else if (values.size() == 1) {
@@ -188,16 +186,16 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             }
             return Optional.of(res);
         });
-        
+
         bindings.bind(Long.class).all((final Path<Long> path, final Collection<? extends Long> values) -> {
             Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
             filterDescriptorMap.put(path, new ArrayList(values));
- 
+
             final List<? extends Long> numbers = new ArrayList<>(values);
             Predicate res;
-            
+
             NumberPath longPath = (NumberPath) path;
-            
+
             if (values.isEmpty()) {
                 res = Expressions.asBoolean(true).isTrue();
             } else if (values.size() == 1) {
@@ -211,16 +209,16 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             }
             return Optional.of(res);
         });
-        
+
         bindings.bind(Double.class).all((final Path<Double> path, final Collection<? extends Double> values) -> {
             Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
             filterDescriptorMap.put(path, new ArrayList(values));
- 
+
             final List<? extends Double> numbers = new ArrayList<>(values);
             Predicate res;
-            
+
             NumberPath doublePath = (NumberPath) path;
-            
+
             if (values.isEmpty()) {
                 res = Expressions.asBoolean(true).isTrue();
             } else if (values.size() == 1) {
@@ -234,16 +232,16 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
             }
             return Optional.of(res);
         });
-        
+
         bindings.bind(Float.class).all((final Path<Float> path, final Collection<? extends Float> values) -> {
             Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
             filterDescriptorMap.put(path, new ArrayList(values));
- 
+
             final List<? extends Float> numbers = new ArrayList<>(values);
             Predicate res;
-            
+
             NumberPath floatPath = (NumberPath) path;
-            
+
             if (values.isEmpty()) {
                 res = Expressions.asBoolean(true).isTrue();
             } else if (values.size() == 1) {
@@ -259,95 +257,95 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         });
 
         bindings.bind(LocalDate.class).all(
-                (
-                        final Path<LocalDate> path,
-                        final Collection<? extends LocalDate> values) -> {
-                    final List<? extends LocalDate> dates = new ArrayList<>(values);
-                                       
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                            
-                    Predicate res;
-                    if (values.size() == 1) {
-                        DatePath datePath = (DatePath) path;
-                        res = datePath.eq(dates.get(0));
-                    } else if (dates.size() == 2) {
-                        Collections.sort(dates);
-                        DatePath datePath = (DatePath) path;
-                        res = datePath.goe(dates.get(0)).and(datePath.loe(dates.get(1)));
-                    } else {
-                        res = Expressions.asBoolean(true).isTrue();
-                    }
-                    return Optional.of(res);
-                });
+            (
+                final Path<LocalDate> path,
+                final Collection<? extends LocalDate> values) -> {
+                final List<? extends LocalDate> dates = new ArrayList<>(values);
+
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(path, new ArrayList(values));
+
+                Predicate res;
+                if (values.size() == 1) {
+                    DatePath datePath = (DatePath) path;
+                    res = datePath.eq(dates.get(0));
+                } else if (dates.size() == 2) {
+                    Collections.sort(dates);
+                    DatePath datePath = (DatePath) path;
+                    res = datePath.goe(dates.get(0)).and(datePath.loe(dates.get(1)));
+                } else {
+                    res = Expressions.asBoolean(true).isTrue();
+                }
+                return Optional.of(res);
+            });
 
         bindings.bind(LocalDateTime.class).all(
-                (
-                        final Path<LocalDateTime> path,
-                        final Collection<? extends LocalDateTime> values) -> {
-                    final List<? extends LocalDateTime> dates = new ArrayList<>(values);
-                    
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                    
-                    Predicate res;
-                    if (values.size() == 1) {
-                        DateTimePath dateTimePath = (DateTimePath) path;
-                        if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
-                            res = dateTimePath.isNull();
-                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
-                            res = dateTimePath.isNotNull();
-                        } else {
-                            dateTimePath = (DateTimePath) path;
-                            LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
-                            LocalDateTime endDate = startDate.plusDays(1);
-                            res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
-                        }
-                    } else if (dates.size() == 2) {
-                        Collections.sort(dates);
-                        DateTimePath dateTimePath = (DateTimePath) path;
+            (
+                final Path<LocalDateTime> path,
+                final Collection<? extends LocalDateTime> values) -> {
+                final List<? extends LocalDateTime> dates = new ArrayList<>(values);
+
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(path, new ArrayList(values));
+
+                Predicate res;
+                if (values.size() == 1) {
+                    DateTimePath dateTimePath = (DateTimePath) path;
+                    if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
+                        res = dateTimePath.isNull();
+                    } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
+                        res = dateTimePath.isNotNull();
+                    } else {
+                        dateTimePath = (DateTimePath) path;
                         LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
-                        LocalDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).plusDays(1);
+                        LocalDateTime endDate = startDate.plusDays(1);
                         res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
-                    } else {
-                        res = Expressions.asBoolean(true).isTrue();
                     }
-                    return Optional.of(res);
-                });
-        
+                } else if (dates.size() == 2) {
+                    Collections.sort(dates);
+                    DateTimePath dateTimePath = (DateTimePath) path;
+                    LocalDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0);
+                    LocalDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).plusDays(1);
+                    res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                } else {
+                    res = Expressions.asBoolean(true).isTrue();
+                }
+                return Optional.of(res);
+            });
+
         bindings.bind(ZonedDateTime.class).all(
-                (
-                        final Path<ZonedDateTime> path,
-                        final Collection<? extends ZonedDateTime> values) -> {
-                    final List<? extends ZonedDateTime> dates = new ArrayList<>(values);
-                    
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                    
-                    Predicate res;
-                    if (values.size() == 1) {
-                        DateTimePath dateTimePath = (DateTimePath) path;
-                        if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
-                            res = dateTimePath.isNull();
-                        } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
-                            res = dateTimePath.isNotNull();
-                        } else {
-                            dateTimePath = (DateTimePath) path;
-                            ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
-                            ZonedDateTime endDate = startDate.plusDays(1);
-                            res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
-                        }
-                    } else if (dates.size() == 2) {
-                        Collections.sort(dates);
-                        DateTimePath dateTimePath = (DateTimePath) path;
-                        ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
-                        ZonedDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone()).plusDays(1);
-                        res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+            (
+                final Path<ZonedDateTime> path,
+                final Collection<? extends ZonedDateTime> values) -> {
+                final List<? extends ZonedDateTime> dates = new ArrayList<>(values);
+
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(path, new ArrayList(values));
+
+                Predicate res;
+                if (values.size() == 1) {
+                    DateTimePath dateTimePath = (DateTimePath) path;
+                    if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9999, Month.JANUARY, 1, 0, 0, 0))) {
+                        res = dateTimePath.isNull();
+                    } else if (dates.get(0).toLocalDate().atTime(0, 0, 0).equals(LocalDateTime.of(9998, Month.JANUARY, 1, 0, 0, 0))) {
+                        res = dateTimePath.isNotNull();
                     } else {
-                        res = Expressions.asBoolean(true).isTrue();
+                        dateTimePath = (DateTimePath) path;
+                        ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
+                        ZonedDateTime endDate = startDate.plusDays(1);
+                        res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
                     }
-                    return Optional.of(res);
-                });
+                } else if (dates.size() == 2) {
+                    Collections.sort(dates);
+                    DateTimePath dateTimePath = (DateTimePath) path;
+                    ZonedDateTime startDate = dates.get(0).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone());
+                    ZonedDateTime endDate = dates.get(1).toLocalDate().atTime(0, 0, 0).atZone(dates.get(0).getZone()).plusDays(1);
+                    res = dateTimePath.goe(startDate).and(dateTimePath.lt(endDate));
+                } else {
+                    res = Expressions.asBoolean(true).isTrue();
+                }
+                return Optional.of(res);
+            });
 
         bindings.bind(Enum.class).first((path, value) -> {
             System.out.println("dentro");
@@ -355,226 +353,226 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         });
 
         bindings.bind(String.class).all((Path<String> path, Collection<? extends String> values) -> {
-                    final List<? extends Object> strings = new ArrayList<>(values);
-                    
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                    
-                    Predicate res;
-                    try {
-                        if (values.isEmpty()) {
-                            res = Expressions.asBoolean(true).isTrue();
-                        } else {
-                            /* gestione dei campi tsvector:
+            final List<? extends Object> strings = new ArrayList<>(values);
+
+            Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+            filterDescriptorMap.put(path, new ArrayList(values));
+
+            Predicate res;
+            try {
+                if (values.isEmpty()) {
+                    res = Expressions.asBoolean(true).isTrue();
+                } else {
+                    /* gestione dei campi tsvector:
                              * se sulla colonna dell'entità c'è l'annotazione Column e in columnDefinition contiene tsvector allora mi trovo in un campo tsvector
                              * in quel caso la ricerca viene effettuata secondo la metodologia di ricerca ts di postgres. Viene richiamata la funzione fts_match
                              *  che viene registrata creando in CustomDialect per hibernate (classe it.nextsw.common.dialect.CustomPostgresDialect).
                              * Per il corretto funzionamento è necessatio abilitare il CustomDialect aggiungendo la seguente riga nell'application.properties del progetto:
                              *  "spring.jpa.properties.hibernate.dialect=it.nextsw.common.dialect.CustomPostgresDialect"
-                             */
-                            String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
-                            if (columDefinition != null && columDefinition.contains("tsvector")) {
-                                BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                                        String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
-                                        path
-                                );
-                                Map<String, String> rankQueryMap = HibernateEntityInspector.rankQueryObj.get();
-                                if (rankQueryMap == null) {
-                                    rankQueryMap = new HashMap();
-                                    HibernateEntityInspector.rankQueryObj.set(rankQueryMap);
-                                }
-                                AnnotatedElement annotatedElement = path.getAnnotatedElement();
-                                String buildingRankQuery = (String) strings.get(0);
+                     */
+                    String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                    if (columDefinition != null && columDefinition.contains("tsvector")) {
+                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                            String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(0)).replace("'", "''")),
+                            path
+                        );
+                        Map<String, String> rankQueryMap = HibernateEntityInspector.rankQueryObj.get();
+                        if (rankQueryMap == null) {
+                            rankQueryMap = new HashMap();
+                            HibernateEntityInspector.rankQueryObj.set(rankQueryMap);
+                        }
+                        AnnotatedElement annotatedElement = path.getAnnotatedElement();
+                        String buildingRankQuery = (String) strings.get(0);
 
-                                if (values.size() > 1) {
-                                    for (int i = 1; i < strings.size(); i++) {
-                                        booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
-                                                String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")), path)));
-                                        buildingRankQuery = buildingRankQuery + " " + ((String) strings.get(i));
-                                    }
-                                }
-                                
-                                if (Field.class.isAssignableFrom(annotatedElement.getClass())) {
-                                    rankQueryMap.put(((Field)annotatedElement).getAnnotation(Column.class).name(), buildingRankQuery);
-                                }
-                                
-                                res = booleanTemplate;
-                            } else if (columDefinition != null && columDefinition.equalsIgnoreCase("text[]")) {
-                                BooleanBuilder b = new BooleanBuilder();
-                                BooleanExpression expression;
-                                for (Object valueObj : values) {
-                                    Object[] value = (Object[]) valueObj;
-                                    if (!StringUtils.hasText((String) value[0])) {
-                                        ArrayPath arrayPath = (ArrayPath) path;
-                                        BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                                "cast(cardinality({0}) as integer)=0", arrayPath
-                                        );
-                                        expression = arrayPath.isNull().or(arrayIsEmpty);
-                                    } else {
-                                        expression = Expressions.booleanTemplate(
-                                                String.format("cast(FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
-                                                path
-                                        );
-                                    }
-                                    b = b.or(expression);
-                                }
-                                res = b;
-                            } //                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
-                            //                                if (strings.size() == 1) {
-                            //                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                            //                                        String.format("FUNCTION('jsonb_match', {0}, '%s')= true", strings.get(0)), 
-                            //                                        path
-                            //                                    ); 
-                            //                                res = booleanTemplate;
-                            //                                } else {
-                            //                                    BooleanBuilder b = new BooleanBuilder();
-                            //                                    for (Object value: strings) {
-                            //                                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                            //                                            String.format("FUNCTION('jsonb_match', {0}, '%s')= true", value,
-                            //                                            path
-                            //                                            ));
-                            //                                        b = b.or(booleanTemplate);
-                            //                                    }
-                            //                                    res = b;
-                            //                                }
-                            //                            } 
-                            else {
-                                StringPath stringPath = (StringPath) path;
-                                if (values.size() == 1) {
-                                    String string;
-                                    if (strings.get(0).getClass().isEnum()) {
-                                        string = ((Enum) strings.get(0)).toString();
-                                        res = stringPath.eq(string);
-                                    } else {
-                                        string = (String) strings.get(0);
-                                        res = getStringPredicate(string, stringPath);
-                                    }
-                                } else {
-                                    BooleanBuilder b = new BooleanBuilder();
-                                    for (Object value : values) {
-                                        if (value.getClass().isEnum()) {
-                                            String string = ((Enum) value).toString();
-                                            b = b.or(stringPath.eq(string));
-                                        } else {
-                                            b = b.or(getStringPredicate((String) value, stringPath));
-                                        }
-                                    }
-                                    res = b;
-                                }
+                        if (values.size() > 1) {
+                            for (int i = 1; i < strings.size(); i++) {
+                                booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
+                                    String.format("FUNCTION('fts_match', 'italian', {0}, '%s')= true", ((String) strings.get(i)).replace("'", "''")), path)));
+                                buildingRankQuery = buildingRankQuery + " " + ((String) strings.get(i));
                             }
                         }
-                        return Optional.of(res);
 
-                    } catch (InvalidFilterException ex) {
-                        return Optional.of(Expressions.asBoolean(true).isTrue());
-                    }
-                });
+                        if (Field.class.isAssignableFrom(annotatedElement.getClass())) {
+                            rankQueryMap.put(((Field) annotatedElement).getAnnotation(Column.class).name(), buildingRankQuery);
+                        }
 
-        bindings.bind(Integer.class).all(
-                (Path<Integer> path, Collection<? extends Integer> values) -> {
-                    final List<? extends Integer> numbers = new ArrayList<>(values);
-                    
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                    
-                    Predicate res;
-                    String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
-                    NextSdrCustomColumnDefinition customColumnDefinitionAnnotation = path.getAnnotatedElement().getAnnotation(NextSdrCustomColumnDefinition.class);
-                    if (customColumnDefinitionAnnotation != null) {
-                        columDefinition = customColumnDefinitionAnnotation.name();
-                    }
-                    if (columDefinition != null && columDefinition.equalsIgnoreCase("integer[]")) {
+                        res = booleanTemplate;
+                    } else if (columDefinition != null && columDefinition.equalsIgnoreCase("text[]")) {
                         BooleanBuilder b = new BooleanBuilder();
                         BooleanExpression expression;
                         for (Object valueObj : values) {
                             Object[] value = (Object[]) valueObj;
-                            if (value[0] == null) {
+                            if (!StringUtils.hasText((String) value[0])) {
                                 ArrayPath arrayPath = (ArrayPath) path;
                                 BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
-                                        "cast(cardinality({0}) as integer)=0", arrayPath
+                                    "cast(cardinality({0}) as integer)=0", arrayPath
                                 );
                                 expression = arrayPath.isNull().or(arrayIsEmpty);
                             } else {
                                 expression = Expressions.booleanTemplate(
-                                        String.format("cast (FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
-                                        path
+                                    String.format("cast(FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "text[]", "&&"),
+                                    path
                                 );
                             }
                             b = b.or(expression);
                         }
                         res = b;
-                    } else if (columDefinition != null && columDefinition.equalsIgnoreCase("bit")) {
-                        // Si vuole fare l'AND bit a bit
-                        BooleanBuilder b = new BooleanBuilder();
-                        for (Object valueObj : values) {
-                            Integer value = (Integer) valueObj;
-                            b = b.or(Expressions.numberTemplate(Integer.class, "function('bitand', {0}, {1})", path, value).gt(0));
-                        }
-                        res = b;
-                    } else {
-                        NumberPath integerPath = (NumberPath) path;
-                        if (values.isEmpty()) {
-                            res = Expressions.asBoolean(true).isTrue();
-                        } else if (values.size() == 1) {
-                            // stratagemma per riuscire a filtrare per null.
-                            // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null e 999999998 come not null
-                            if (numbers.get(0) == 999999999) {
-                                res = integerPath.isNull();
-                            } else if (numbers.get(0) == 999999998) {
-                                res = integerPath.isNotNull();
+                    } //                            else if (columDefinition != null && columDefinition.contains("jsonb")) {
+                    //                                if (strings.size() == 1) {
+                    //                                    BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                    //                                        String.format("FUNCTION('jsonb_match', {0}, '%s')= true", strings.get(0)),
+                    //                                        path
+                    //                                    );
+                    //                                res = booleanTemplate;
+                    //                                } else {
+                    //                                    BooleanBuilder b = new BooleanBuilder();
+                    //                                    for (Object value: strings) {
+                    //                                        BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                    //                                            String.format("FUNCTION('jsonb_match', {0}, '%s')= true", value,
+                    //                                            path
+                    //                                            ));
+                    //                                        b = b.or(booleanTemplate);
+                    //                                    }
+                    //                                    res = b;
+                    //                                }
+                    //                            }
+                    else {
+                        StringPath stringPath = (StringPath) path;
+                        if (values.size() == 1) {
+                            String string;
+                            if (strings.get(0).getClass().isEnum()) {
+                                string = ((Enum) strings.get(0)).toString();
+                                res = stringPath.eq(string);
                             } else {
-                                res = integerPath.eq(numbers.get(0));
+                                string = (String) strings.get(0);
+                                res = getStringPredicate(string, stringPath);
                             }
                         } else {
                             BooleanBuilder b = new BooleanBuilder();
-                            for (Integer value : values) {
-                                b = b.or(integerPath.eq(value));
+                            for (Object value : values) {
+                                if (value.getClass().isEnum()) {
+                                    String string = ((Enum) value).toString();
+                                    b = b.or(stringPath.eq(string));
+                                } else {
+                                    b = b.or(getStringPredicate((String) value, stringPath));
+                                }
                             }
                             res = b;
                         }
                     }
+                }
+                return Optional.of(res);
 
-                    return Optional.of(res);
-                });
+            } catch (InvalidFilterException ex) {
+                return Optional.of(Expressions.asBoolean(true).isTrue());
+            }
+        });
+
+        bindings.bind(Integer.class).all(
+            (Path<Integer> path, Collection<? extends Integer> values) -> {
+                final List<? extends Integer> numbers = new ArrayList<>(values);
+
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(path, new ArrayList(values));
+
+                Predicate res;
+                String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                NextSdrCustomColumnDefinition customColumnDefinitionAnnotation = path.getAnnotatedElement().getAnnotation(NextSdrCustomColumnDefinition.class);
+                if (customColumnDefinitionAnnotation != null) {
+                    columDefinition = customColumnDefinitionAnnotation.name();
+                }
+                if (columDefinition != null && columDefinition.equalsIgnoreCase("integer[]")) {
+                    BooleanBuilder b = new BooleanBuilder();
+                    BooleanExpression expression;
+                    for (Object valueObj : values) {
+                        Object[] value = (Object[]) valueObj;
+                        if (value[0] == null) {
+                            ArrayPath arrayPath = (ArrayPath) path;
+                            BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
+                                "cast(cardinality({0}) as integer)=0", arrayPath
+                            );
+                            expression = arrayPath.isNull().or(arrayIsEmpty);
+                        } else {
+                            expression = Expressions.booleanTemplate(
+                                String.format("cast (FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true", org.apache.commons.lang3.StringUtils.join(value, ","), "integer[]", "&&"),
+                                path
+                            );
+                        }
+                        b = b.or(expression);
+                    }
+                    res = b;
+                } else if (columDefinition != null && columDefinition.equalsIgnoreCase("bit")) {
+                    // Si vuole fare l'AND bit a bit
+                    BooleanBuilder b = new BooleanBuilder();
+                    for (Object valueObj : values) {
+                        Integer value = (Integer) valueObj;
+                        b = b.or(Expressions.numberTemplate(Integer.class, "function('bitand', {0}, {1})", path, value).gt(0));
+                    }
+                    res = b;
+                } else {
+                    NumberPath integerPath = (NumberPath) path;
+                    if (values.isEmpty()) {
+                        res = Expressions.asBoolean(true).isTrue();
+                    } else if (values.size() == 1) {
+                        // stratagemma per riuscire a filtrare per null.
+                        // siccome, se passo null da errore perchè non è un numero, interpreto 999999999 come null e 999999998 come not null
+                        if (numbers.get(0) == 999999999) {
+                            res = integerPath.isNull();
+                        } else if (numbers.get(0) == 999999998) {
+                            res = integerPath.isNotNull();
+                        } else {
+                            res = integerPath.eq(numbers.get(0));
+                        }
+                    } else {
+                        BooleanBuilder b = new BooleanBuilder();
+                        for (Integer value : values) {
+                            b = b.or(integerPath.eq(value));
+                        }
+                        res = b;
+                    }
+                }
+
+                return Optional.of(res);
+            });
 
         bindings.bind(JsonNode.class).all(
-                (Path<JsonNode> path, Collection<? extends JsonNode> values) -> {
-                    final List<? extends Object> strings = new ArrayList<>(values);
-                    
-                    Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
-                    filterDescriptorMap.put(path, new ArrayList(values));
-                    
-                    Predicate res;
-                    try {
-                        if (values.isEmpty()) {
-                            res = Expressions.asBoolean(true).isTrue();
-                        } else {
-                            String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
-                            if (columDefinition != null && columDefinition.contains("jsonb")) {
-                                BooleanExpression booleanTemplate = Expressions.booleanTemplate(
-                                    String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", (String) strings.get(0)),
-                                    path
-                                );
-                                
-                                if (values.size() > 1) {
-                                    for (int i = 1; i < strings.size(); i++) {
-                                        booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
-                                                String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", ((String) strings.get(i))),
-                                                path)));
-                                    }
-                                }
-                                
-                                res = booleanTemplate;
-                            }  else {
-                                res = Expressions.asBoolean(true).isTrue();;
-                            }
-                        }
-                        return Optional.of(res);
+            (Path<JsonNode> path, Collection<? extends JsonNode> values) -> {
+                final List<? extends Object> strings = new ArrayList<>(values);
 
-                    } catch (Exception ex) {
-                        return Optional.of(Expressions.asBoolean(true).isTrue());
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(path, new ArrayList(values));
+
+                Predicate res;
+                try {
+                    if (values.isEmpty()) {
+                        res = Expressions.asBoolean(true).isTrue();
+                    } else {
+                        String columDefinition = path.getAnnotatedElement().getAnnotation(Column.class).columnDefinition();
+                        if (columDefinition != null && columDefinition.contains("jsonb")) {
+                            BooleanExpression booleanTemplate = Expressions.booleanTemplate(
+                                String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", (String) strings.get(0)),
+                                path
+                            );
+
+                            if (values.size() > 1) {
+                                for (int i = 1; i < strings.size(); i++) {
+                                    booleanTemplate = (booleanTemplate.or(Expressions.booleanTemplate(
+                                        String.format("FUNCTION('jsonb_contains', {0}, '%s') = true", ((String) strings.get(i))),
+                                        path)));
+                                }
+                            }
+
+                            res = booleanTemplate;
+                        } else {
+                            res = Expressions.asBoolean(true).isTrue();;
+                        }
                     }
-                });
+                    return Optional.of(res);
+
+                } catch (Exception ex) {
+                    return Optional.of(Expressions.asBoolean(true).isTrue());
+                }
+            });
     }
 
     default StringOperation getStringOperation(String valueToParse) throws InvalidFilterException {
@@ -609,12 +607,14 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
         BooleanExpression res;
 
         StringOperation stringOperation = getStringOperation(valueToParse);
-      
+
         if (stringOperation.getOperator().equals(StringOperation.Operators.equals)) {
             res = stringPath.eq(stringOperation.getValue());
+        } else if (stringOperation.getOperator().equals(StringOperation.Operators.notEquals)) {
+            res = stringPath.ne(stringOperation.getValue());
         } else {
             res = Expressions.booleanTemplate(
-//                String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue(), stringOperation.getOperator().toString()),
+                //                String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue(), stringOperation.getOperator().toString()),
                 String.format("FUNCTION('like', {0}, '%s', '%s') = true", stringOperation.getValue().replace("'", "''"), stringOperation.getOperator().toString()),
                 stringPath
             );
