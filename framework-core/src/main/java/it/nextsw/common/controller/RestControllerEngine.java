@@ -1,13 +1,12 @@
 package it.nextsw.common.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import it.nextsw.common.data.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.interceptors.ParameterizedInterceptor;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.google.common.base.Splitter;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -19,6 +18,7 @@ import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.data.types.ForeignKey;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
+import tools.jackson.core.JacksonException;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
@@ -50,6 +50,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.hibernate.type.SqlTypes;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -423,6 +424,27 @@ public abstract class RestControllerEngine {
             throw new RestControllerEngineException("errore nell'update", ex);
         }
     }
+    
+    /**
+     * Torna true se il nome del campo passato è un campo presente sull'entità e questo campo è un campo che potrebbe interessare l'aggiornamento.
+     * Quindi è annotato come Column, OneToMany/ManyToOne/OneToOne/ManyToMany, oppure Version
+     * @param key
+     * @param entityClass
+     * @return 
+     */
+    private boolean isUpdatableField(String key, Class entityClass) {
+        Field field = null;
+        try {
+            field = EntityReflectionUtils.getDeclaredField(entityClass, key);
+        } catch (Exception runtimeException) {
+        }
+        if (field != null) {
+            return EntityReflectionUtils.isColumnOrVersionOrFkField(field);
+        } else {
+            return false;
+        }
+    }
+    
 
     /**
      * Setta i valori presenti nella mappa "data" sull'entità preservando gli
@@ -445,7 +467,7 @@ public abstract class RestControllerEngine {
      * @throws NoSuchFieldException
      * @throws EntityReflectionException
      * @throws ClassNotFoundException
-     * @throws JsonProcessingException
+     * @throws JacksonException
      * @throws IOException
      * @throws AbortSaveInterceptorException
      * @throws InstantiationException
@@ -489,8 +511,16 @@ public abstract class RestControllerEngine {
                             manageDateMerge(entity, value, setMethod);
                         } else if ((Object[].class).isAssignableFrom(setMethod.getParameterTypes()[0])) {
                             manageArrayMerge(entity, value, setMethod);
-                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
-                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType"))) {
+                        } else if (
+                                field.getAnnotation(org.hibernate.annotations.Type.class) != null 
+                                && (
+                                    ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonBinaryType")
+                                    || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).value().getSimpleName().equals("JsonType")
+                                ) || (
+                                field.getAnnotation(org.hibernate.annotations.JdbcTypeCode.class) != null && 
+                                    ((org.hibernate.annotations.JdbcTypeCode) field.getAnnotation(org.hibernate.annotations.JdbcTypeCode.class)).value() == SqlTypes.JSON))
+//                            @JdbcTypeCode(SqlTypes.JSON)
+                                 {
 //                        } else if (field.getAnnotation(org.hibernate.annotations.Type.class) != null && (((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("jsonb")
 //                                || ((org.hibernate.annotations.Type) field.getAnnotation(org.hibernate.annotations.Type.class)).type().equals("json"))) {
                             manageJsonMerge(entity, entityClass, key, value, request, additionalDataMap, setMethod, getMethod);
@@ -547,7 +577,10 @@ public abstract class RestControllerEngine {
         if (versionField != null
                 && /* se nell'entità c'è solo il campo chiave primario (oppure solo il campo chiave primario e il campo version) vuol dire
                  * che non sto modificando questa entità, ma al massimo sto cambiando la foreign key sull'entità padre, per cui salto il controllo
-                 */ data.keySet().stream().anyMatch(key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName())))) {
+                 */ 
+                data.keySet().stream().anyMatch(
+                    key -> (!key.equals(pkFieldName) && !key.equals(versionField.getName()) && isUpdatableField(key, entityClass))
+                )) {
             Method getMethod = EntityReflectionUtils.getGetMethod(entityClass, versionField.getName());
             Object entityVersionValue = getMethod.invoke(entity);
             Object value = data.get(versionField.getName());
@@ -776,7 +809,7 @@ public abstract class RestControllerEngine {
                     } else if (ZonedDateTime.class.isAssignableFrom(valueEntityClass)) {
                         ZonedDateTime zonedDateTime = ZonedDateTime.parse(value.toString(), DateTimeFormatter.ISO_ZONED_DATE_TIME).truncatedTo(ChronoUnit.MILLIS);
                         valueEntity = ((ZonedDateTime) valueEntity).truncatedTo(ChronoUnit.MILLIS);
-                        if (!zonedDateTime.equals(valueEntity)) {
+                        if (!zonedDateTime.isEqual((ZonedDateTime)valueEntity)) {
                             return true;
                         }
                     } else if ((Object[].class).isAssignableFrom(valueEntityClass)) {
@@ -863,7 +896,7 @@ public abstract class RestControllerEngine {
         try {
             JsonNode valueJsonNode = objectMapper.readTree((String) value);
             return true;
-        } catch (IOException | ClassCastException ex) {
+        } catch (ClassCastException ex) {
             return false;
         }
     }
@@ -1306,8 +1339,8 @@ public abstract class RestControllerEngine {
      * un oggetto a partire dalla quella. usare BeforeUpdateEntityApplier al suo
      * posto, perché con la modalità usata in questa funzione potrebbero non
      * esser copiate proprietà identificate con
-     * {@link com.fasterxml.jackson.annotation.JsonIgnore} o
-     * {@link com.fasterxml.jackson.annotation.JsonBackReference}
+     * {@link tools.jackson.annotation.JsonIgnore} o
+     * {@link tools.jackson.annotation.JsonBackReference}
      *
      * @param entity l'entità da clonare
      * @return il clone dell'entità
@@ -1326,12 +1359,12 @@ public abstract class RestControllerEngine {
      * batch da eseguire
      * @param request
      * @return
-     * @throws JsonProcessingException
+     * @throws JacksonException
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JacksonException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         Object res = null;
         for (BatchOperation batchOperation : data) {
             JpaRepository generalRepository = (JpaRepository) this.customRepositoryPathMap.get(batchOperation.getEntityPath());
