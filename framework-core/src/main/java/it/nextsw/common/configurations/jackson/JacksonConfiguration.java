@@ -3,9 +3,10 @@ package it.nextsw.common.configurations.jackson;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.module.SimpleModule;
 
 /**
  *
@@ -14,14 +15,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class JacksonConfiguration {
 
+//    @Bean
+//    public Module dateTimeModule() {
+//        SimpleModule module = new SimpleModule();
+//        module.addDeserializer(ZonedDateTime.class, new ZoneDateTimeDeserializer());
+//        module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer());
+//        module.addDeserializer(LocalDate.class, new LocalDateDeserializer());
+//        return module;
+//    }
+    
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer jsonCustomizer() {
-//        SimpleModule s = new SimpleModule();
-//        s.addDeserializer(ZonedDateTime.class, new ZoneDateTimeDeserializer(ZonedDateTime.class));
-        return builder -> builder
-//                .serializerByType(ZonedDateTime.class, new ZoneDateTimeSerializer(ZonedDateTime.class))
-                .deserializerByType(ZonedDateTime.class, new ZoneDateTimeDeserializer(ZonedDateTime.class))
-                .deserializerByType(LocalDateTime.class, new LocalDateTimeDeserializer(LocalDateTime.class))
-                .deserializerByType(LocalDate.class, new LocalDateDeserializer(LocalDate.class));
+    public JsonMapperBuilderCustomizer jsonCustomizer() {
+        return builder -> {
+            SimpleModule module = new SimpleModule();
+
+            module.addDeserializer(ZonedDateTime.class, new ZoneDateTimeDeserializer(ZonedDateTime.class));
+            module.addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(LocalDateTime.class));
+            module.addDeserializer(LocalDate.class, new LocalDateDeserializer(LocalDate.class));
+
+            builder.addModule(module);
+        };
     }
 }

@@ -1,13 +1,12 @@
 package it.nextsw.common.configurations.jackson;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import java.io.IOException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.deser.std.StdDeserializer;
+import tools.jackson.core.JacksonException;
+
 import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -16,6 +15,10 @@ import java.time.format.DateTimeFormatter;
  */
 public class LocalDateTimeDeserializer extends StdDeserializer<LocalDateTime> {
 
+    public LocalDateTimeDeserializer() {
+        super(LocalDateTime.class);
+    }
+    
     public LocalDateTimeDeserializer(Class<LocalDateTime> vc) {
         super(vc);
     }
@@ -29,7 +32,7 @@ public class LocalDateTimeDeserializer extends StdDeserializer<LocalDateTime> {
     }
 
     @Override
-    public LocalDateTime deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+    public LocalDateTime deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         String dateString = p.getText();
         LocalDateTime dateTime = LocalDateTime.parse(dateString, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         return dateTime;
