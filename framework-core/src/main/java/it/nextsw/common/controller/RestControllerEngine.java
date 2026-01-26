@@ -65,6 +65,7 @@ import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.exc.StreamReadException;
 
 /**
  * Questa è la classe che deve essere estesa dai controller che vogliono
@@ -896,7 +897,7 @@ public abstract class RestControllerEngine {
         try {
             JsonNode valueJsonNode = objectMapper.readTree((String) value);
             return true;
-        } catch (ClassCastException ex) {
+        } catch (ClassCastException | StreamReadException ex) {
             return false;
         }
     }
