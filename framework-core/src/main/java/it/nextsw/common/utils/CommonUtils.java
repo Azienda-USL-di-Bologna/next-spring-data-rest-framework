@@ -28,6 +28,20 @@ public class CommonUtils {
     @Autowired
     private Environment env;
 
+    
+    
+    public String getScheme(HttpServletRequest request) {
+        String res;
+        String header = request.getHeader("X-Forwarded-Proto");
+        if (StringUtils.hasText(header)) {
+            String[] headerToken = header.split(",");
+            res = headerToken[0];
+        } else {
+            res = request.getScheme();
+        }
+        return res;
+    }
+    
     public String getHostname(HttpServletRequest request) {
 
         String res;
@@ -38,6 +52,19 @@ public class CommonUtils {
             res = headerToken[0];
         } else {
             res = request.getServerName();
+        }
+        return res;
+    }
+    
+    public Integer getPort(HttpServletRequest request) {
+
+        Integer res;
+        String header = request.getHeader("X-Forwarded-Port");
+        if (StringUtils.hasText(header)) {
+            String[] headerToken = header.split(",");
+            res = Integer.valueOf(headerToken[0]);
+        } else {
+            res = request.getServerPort();
         }
         return res;
     }

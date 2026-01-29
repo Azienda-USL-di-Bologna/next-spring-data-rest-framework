@@ -12,7 +12,9 @@ public class StringOperation {
         contains,
         containsIgnoreCase,
         equals,
-        equalsIgnoreCase
+        equalsIgnoreCase,
+        notEquals,
+        notEqualsIgnoreCase
     }
 
     private Operators operator;
