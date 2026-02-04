@@ -985,7 +985,21 @@ public abstract class RestControllerEngine {
      * @throws Exception
      */
     protected void manageOtherCasesMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        setMethod.invoke(entity, value);
+        boolean isEntity = false;
+        Class<?> parameterType = null;
+        try {
+            parameterType = setMethod.getParameterTypes()[0];
+            isEntity = EntityReflectionUtils.isEntityClassFromProxyObject(parameterType);
+        }
+        catch (Exception ex) {
+            LOGGER.warn("Unable to determine if is an entity");
+        }
+        if (isEntity && parameterType != null) {
+            setMethod.invoke(entity, objectMapper.convertValue(value, parameterType));
+        } else {
+            setMethod.invoke(entity, value);
+        }
+
     }
 
     /**
