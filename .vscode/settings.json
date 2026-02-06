@@ -1,0 +1,25 @@
+{
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.debug.settings.onBuildFailureProceed": true,
+  
+  // 1. Configurazione Maven
+  "maven.executable.path": "C:\\maven\\apache-maven-3.9.12\\bin\\mvn.cmd", 
+  "maven.terminal.useJavaHome": true,
+  
+  // 2. FORZIAMO LA JAVA_HOME PER MAVEN (Aggiungi questo blocco!)
+  "maven.terminal.customEnv": [
+      {
+          "environmentVariable": "JAVA_HOME",
+          "value": "C:\\Program Files\\java\\jdk-25.0.1"
+      }
+  ],
+
+  // 3. Configurazione Java per l'Editor (IntelliSense)
+  "java.configuration.runtimes": [
+      {
+          "name": "JavaSE-25",
+          "path": "C:\\Program Files\\java\\jdk-25.0.1",
+          "default": true
+      }
+  ]
+}
