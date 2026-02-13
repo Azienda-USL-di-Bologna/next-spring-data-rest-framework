@@ -1,12 +1,8 @@
 package it.nextsw.common.configurations.spring;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import it.nextsw.common.data.configurations.AbstractJsonTypeConverterFactory;
 import it.nextsw.common.interceptors.RequestInterceptor;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.reflections.Reflections;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.format.FormatterRegistry;

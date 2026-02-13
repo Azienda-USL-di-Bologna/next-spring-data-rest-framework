@@ -17,10 +17,12 @@ public class BatchOperation {
     private Map<String, String> additionalData;
     private Boolean refreshSavedEntity = false;
 
+//    @JsonCreator
     public BatchOperation() {
     }
 
     public BatchOperation(Operations operation, Object id, String entityPath, String returnProjection, Map<String, Object> entityBody, Map<String, String> additionalData, Boolean refreshSavedEntity) {
+        System.out.println("nel costruttore sbagliato");
         this.operation = operation;
         this.id = id;
         this.entityPath = entityPath;

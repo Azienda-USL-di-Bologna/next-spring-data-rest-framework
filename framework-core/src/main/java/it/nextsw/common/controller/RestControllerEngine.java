@@ -1,13 +1,12 @@
 package it.nextsw.common.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import it.nextsw.common.data.annotations.NextSdrInterceptor;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.interceptors.ParameterizedInterceptor;
 import it.nextsw.common.interceptors.RestControllerInterceptorEngine;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.google.common.base.Splitter;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -19,6 +18,7 @@ import it.nextsw.common.utils.CommonUtils;
 import it.nextsw.common.utils.EntityReflectionUtils;
 import it.nextsw.common.data.types.ForeignKey;
 import it.nextsw.common.utils.exceptions.EntityReflectionException;
+import tools.jackson.core.JacksonException;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.interceptors.exceptions.AbortLoadInterceptorException;
 import it.nextsw.common.interceptors.exceptions.InterceptorException;
@@ -65,6 +65,7 @@ import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.exc.StreamReadException;
 
 /**
  * Questa è la classe che deve essere estesa dai controller che vogliono
@@ -467,7 +468,7 @@ public abstract class RestControllerEngine {
      * @throws NoSuchFieldException
      * @throws EntityReflectionException
      * @throws ClassNotFoundException
-     * @throws JsonProcessingException
+     * @throws JacksonException
      * @throws IOException
      * @throws AbortSaveInterceptorException
      * @throws InstantiationException
@@ -896,7 +897,7 @@ public abstract class RestControllerEngine {
         try {
             JsonNode valueJsonNode = objectMapper.readTree((String) value);
             return true;
-        } catch (IOException | ClassCastException ex) {
+        } catch (ClassCastException | StreamReadException ex) {
             return false;
         }
     }
@@ -984,7 +985,21 @@ public abstract class RestControllerEngine {
      * @throws Exception
      */
     protected void manageOtherCasesMerge(Object entity, Class entityClass, String key, Object value, HttpServletRequest request, Map<String, String> additionalDataMap, Method setMethod, Method getMethod) throws Exception {
-        setMethod.invoke(entity, value);
+        boolean isEntity = false;
+        Class<?> parameterType = null;
+        try {
+            parameterType = setMethod.getParameterTypes()[0];
+            isEntity = EntityReflectionUtils.isEntityClassFromProxyObject(parameterType);
+        }
+        catch (Exception ex) {
+            LOGGER.warn("Unable to determine if is an entity");
+        }
+        if (isEntity && parameterType != null) {
+            setMethod.invoke(entity, objectMapper.convertValue(value, parameterType));
+        } else {
+            setMethod.invoke(entity, value);
+        }
+
     }
 
     /**
@@ -1339,8 +1354,8 @@ public abstract class RestControllerEngine {
      * un oggetto a partire dalla quella. usare BeforeUpdateEntityApplier al suo
      * posto, perché con la modalità usata in questa funzione potrebbero non
      * esser copiate proprietà identificate con
-     * {@link com.fasterxml.jackson.annotation.JsonIgnore} o
-     * {@link com.fasterxml.jackson.annotation.JsonBackReference}
+     * {@link tools.jackson.annotation.JsonIgnore} o
+     * {@link tools.jackson.annotation.JsonBackReference}
      *
      * @param entity l'entità da clonare
      * @return il clone dell'entità
@@ -1359,12 +1374,12 @@ public abstract class RestControllerEngine {
      * batch da eseguire
      * @param request
      * @return
-     * @throws JsonProcessingException
+     * @throws JacksonException
      * @throws RestControllerEngineException
      * @throws AbortSaveInterceptorException
      * @throws NotFoundResourceException
      */
-    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JsonProcessingException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
+    public Object batch(List<BatchOperation> data, HttpServletRequest request) throws JacksonException, RestControllerEngineException, AbortSaveInterceptorException, NotFoundResourceException {
         Object res = null;
         for (BatchOperation batchOperation : data) {
             JpaRepository generalRepository = (JpaRepository) this.customRepositoryPathMap.get(batchOperation.getEntityPath());
