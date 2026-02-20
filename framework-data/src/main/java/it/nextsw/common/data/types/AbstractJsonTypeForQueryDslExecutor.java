@@ -1,9 +1,7 @@
 package it.nextsw.common.data.types;
 
-import it.nextsw.common.data.types.AbstractJsonType;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import it.nextsw.common.data.utils.NextSDRDataApplicationContextUtil;
 
 /**
@@ -31,7 +29,7 @@ public class AbstractJsonTypeForQueryDslExecutor extends AbstractJsonType {
         this.jsonNode = jsonNode;
     }
     
-    public String toJsonString() throws JsonProcessingException {
+    public String toJsonString() {
         ObjectMapper objectMapper = NextSDRDataApplicationContextUtil.getApplicationContext().getBean(ObjectMapper.class);
         return objectMapper.writeValueAsString(jsonNode);
     }

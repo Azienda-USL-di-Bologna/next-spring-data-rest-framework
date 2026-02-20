@@ -1,9 +1,10 @@
 package it.nextsw.common.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import it.nextsw.common.controller.exceptions.NotFoundResourceException;
 import it.nextsw.common.controller.exceptions.RestControllerEngineException;
 import it.nextsw.common.interceptors.exceptions.AbortSaveInterceptorException;
+import tools.jackson.core.JacksonException;
+
 import java.util.List;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
@@ -79,12 +80,12 @@ public abstract class BaseCrudController {
     @Transactional(rollbackFor = {Throwable.class})
     public ResponseEntity<?> batchResources(
             @RequestBody List<BatchOperation> data,
-            HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JsonProcessingException, NotFoundResourceException, NullPointerException {
+            HttpServletRequest request) throws RestControllerEngineException, AbortSaveInterceptorException, JacksonException, NotFoundResourceException, NullPointerException {
         try {
             log.info("executing batch operation...");
             Object batch = getRestControllerEngine().batch(data, request);
             return new ResponseEntity(batch, HttpStatus.OK);
-        } catch (JsonProcessingException | NotFoundResourceException | NullPointerException ex) {
+        } catch (JacksonException | NotFoundResourceException | NullPointerException ex) {
             throw ex;
         }
     }

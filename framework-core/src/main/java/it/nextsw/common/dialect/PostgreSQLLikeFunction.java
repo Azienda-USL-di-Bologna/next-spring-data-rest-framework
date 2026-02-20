@@ -9,14 +9,12 @@ import static it.nextsw.common.repositories.StringOperation.Operators.startsWith
 import java.util.List;
 import org.hibernate.QueryException;
 import org.hibernate.dialect.function.StandardSQLFunction;
-import org.hibernate.engine.spi.SessionFactoryImplementor;
-import org.hibernate.query.ReturnableType;
+import org.hibernate.metamodel.model.domain.ReturnableType;
 import org.hibernate.sql.ast.SqlAstTranslator;
 import org.hibernate.sql.ast.spi.SqlAppender;
 import org.hibernate.sql.ast.tree.SqlAstNode;
 import org.hibernate.sql.ast.tree.expression.Literal;
 import org.hibernate.type.StandardBasicTypes;
-import org.hibernate.type.Type;
 
 /**
  *
@@ -100,24 +98,27 @@ public class PostgreSQLLikeFunction extends StandardSQLFunction {
         StringOperation.Operators operator = StringOperation.Operators.valueOf(operation);
 
         switch (operator) {
-            case contains ->
+            case contains:
                 value = "%" + value + "%";
-            case containsIgnoreCase -> {
+                break;
+            case containsIgnoreCase:
                 value = "%" + value + "%";
                 likeOperator = "ilike";
-            }
-            case startsWith ->
+                break;
+            case startsWith:
                 value = value + "%";
-            case startsWithIgnoreCase -> {
+                break;
+            case startsWithIgnoreCase:
                 value = value + "%";
                 likeOperator = "ilike";
-            }
-            case equalsIgnoreCase ->
+                break;
+            case equalsIgnoreCase:
                 likeOperator = "ilike";
-            case notEqualsIgnoreCase ->
+                break;
+            case notEqualsIgnoreCase:
                 likeOperator = "not ilike";
-
-            default ->
+                break;
+            default:
                 throw new QueryException(String.format("operatore %s non valido", operator), "");
         }
 
