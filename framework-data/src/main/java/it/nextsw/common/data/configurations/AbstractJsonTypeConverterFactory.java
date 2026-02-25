@@ -1,8 +1,7 @@
 package it.nextsw.common.data.configurations;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import it.nextsw.common.data.types.AbstractJsonType;
 import it.nextsw.common.data.types.AbstractJsonTypeForQueryDslExecutor;
 import org.springframework.core.convert.converter.Converter;
@@ -42,12 +41,9 @@ public class AbstractJsonTypeConverterFactory implements ConverterFactory<String
         @Override
         public T convert(String source) {
             JsonNode readValue;
-            try {
-                readValue = mapper.readValue((String)source, JsonNode.class);
-                return (T) new AbstractJsonTypeForQueryDslExecutor(readValue);
-            } catch (JsonProcessingException ex) {
-                throw new RuntimeException("errore nella conversione della stringa %s in JsonNode", ex);
-            }
+            readValue = mapper.readValue((String)source, JsonNode.class);
+            return (T) new AbstractJsonTypeForQueryDslExecutor(readValue);
+            
         }
     }
 }
