@@ -723,7 +723,9 @@ public abstract class RestControllerEngine {
      * @return
      */
     protected Object retriveEntity(Class entityClass, Object entityKey) {
-        return em.find(entityClass, entityKey);
+        Class<?> pkType = EntityReflectionUtils.getPrimaryKeyField(entityClass).getType();
+        Object typedKey = objectMapper.convertValue(entityKey, pkType);
+        return em.find(entityClass, typedKey);
     }
 
     /**
@@ -1154,9 +1156,12 @@ public abstract class RestControllerEngine {
              * - se lo trovo allora vorrà dire che farò un update
              * - se non lo trovo allora provo a caricarla dal DB, se c'è allora vuol dire che la voglio associare all'entità, altrimenti vorrà dire che farò un insert
              */
-            Object childValuePk = childValue.get(childPrimaryKeyField.getName());
+            Object rawChildValuePk = childValue.get(childPrimaryKeyField.getName());
 
-            if (childValuePk != null) {
+            if (rawChildValuePk != null) {
+                Class<?> childPkType = childPrimaryKeyField.getType();
+                final Object childValuePk = objectMapper.convertValue(rawChildValuePk, childPkType);
+
                 Optional childEntityOp = entityElementsCollection.stream().filter(e -> {
                     Object pk;
                     try {
@@ -1164,7 +1169,7 @@ public abstract class RestControllerEngine {
                     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
                         return false;
                     }
-                    return pk.equals(childValuePk);
+                    return Objects.equals(pk, childValuePk);
                 }).findFirst();
                 if (childEntityOp.isPresent()) {
                     inserting = false;
