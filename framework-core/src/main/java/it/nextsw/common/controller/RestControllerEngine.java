@@ -254,6 +254,7 @@ public abstract class RestControllerEngine {
             // salvataggio dell'entità
             generalRepository.save(entity);
             if (refreshSavedEntity) {
+                em.flush();
                 em.refresh(entity);
             }
 
@@ -402,6 +403,7 @@ public abstract class RestControllerEngine {
 
                 generalRepository.save(res);
                 if (refreshSavedEntity) {
+                    em.flush();
                     em.refresh(res);
                 }
 
