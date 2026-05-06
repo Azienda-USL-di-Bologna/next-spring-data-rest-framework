@@ -24,8 +24,11 @@ import it.nextsw.common.data.types.AbstractJsonTypeForQueryDslExecutor;
 import it.nextsw.common.interceptors.NextSdrControllerInterceptor;
 import it.nextsw.common.repositories.exceptions.InvalidFilterException;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -44,6 +47,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
 import org.springframework.data.querydsl.binding.QuerydslBinderCustomizer;
+import org.springframework.data.querydsl.binding.MultiValueBinding;
 import org.springframework.data.querydsl.binding.QuerydslBindings;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
@@ -70,6 +74,7 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
      */
     @Override
     @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
     default void customize(QuerydslBindings bindings, T entityPath) {
 
         NextSdrControllerInterceptor.filterDescriptor.remove(); // Mi assicuro di reinizializzare la varibaile threadlocal
@@ -161,6 +166,89 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                     }
                 }
             }
+        }
+
+        /*
+         * Array PostgreSQL il cui elemento Java è un enum (es. scripta.tipologie_docs[] ↔ TipologiaDoc[]):
+         * il default QueryDSL genera confronti non validi sul tipo DB. Si usa la stessa FUNCTION('array_operation', …)
+         * già registrata in CustomPostgresDialect, con il tipo SQL preso da @Column(columnDefinition).
+         */
+        for (Field qField : entityPath.getClass().getDeclaredFields()) {
+            if (Modifier.isStatic(qField.getModifiers()) || !ArrayPath.class.isAssignableFrom(qField.getType())) {
+                continue;
+            }
+            if (resolveArrayPathEnumElementType(qField) == null) {
+                continue;
+            }
+            Field entityField;
+            try {
+                entityField = entityPath.getType().getDeclaredField(qField.getName());
+            } catch (NoSuchFieldException e) {
+                continue;
+            }
+            entityField.setAccessible(true);
+            Column columnAnn = entityField.getAnnotation(Column.class);
+            if (columnAnn == null) {
+                continue;
+            }
+            String pgArrayType = columnAnn.columnDefinition();
+            NextSdrCustomColumnDefinition customColumnDefinitionAnnotation = entityField.getAnnotation(NextSdrCustomColumnDefinition.class);
+            if (customColumnDefinitionAnnotation != null) {
+                pgArrayType = customColumnDefinitionAnnotation.name();
+            }
+            if (!StringUtils.hasText(pgArrayType) || !pgArrayType.contains("[]")) {
+                continue;
+            }
+            if (pgArrayType.equalsIgnoreCase("text[]") || pgArrayType.equalsIgnoreCase("integer[]")) {
+                continue;
+            }
+            final ArrayPath<?, ?> arrayPath;
+            try {
+                qField.setAccessible(true);
+                arrayPath = (ArrayPath<?, ?>) qField.get(entityPath);
+            } catch (IllegalAccessException e) {
+                continue;
+            }
+            final String pgArrayTypeForBind = pgArrayType;
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            MultiValueBinding enumPgArrayOverlapBinding = (path, values) -> {
+                ArrayPath ap = (ArrayPath) path;
+                Map<Path<?>, List<Object>> filterDescriptorMap = NextSdrControllerInterceptor.filterDescriptor.get();
+                filterDescriptorMap.put(ap, new ArrayList<>(values));
+                Predicate res;
+                if (values.isEmpty()) {
+                    res = Expressions.asBoolean(true).isTrue();
+                } else {
+                    BooleanBuilder b = new BooleanBuilder();
+                    for (Object valueObj : values) {
+                        List<String> tokens = enumArrayFilterTokens(valueObj);
+                        if (tokens.isEmpty()) {
+                            BooleanTemplate arrayIsEmpty = Expressions.booleanTemplate(
+                                "cast(cardinality({0}) as integer)=0", ap
+                            );
+                            b = b.or(ap.isNull().or(arrayIsEmpty));
+                        } else {
+                            List<String> escaped = new ArrayList<>(tokens.size());
+                            for (String t : tokens) {
+                                escaped.add(t.replace("'", "''"));
+                            }
+                            String joined = org.apache.commons.lang3.StringUtils.join(escaped, ",");
+                            b = b.or(Expressions.booleanTemplate(
+                                String.format(
+                                    "cast(FUNCTION('array_operation', '%s', '%s', {0}, '%s') as boolean)=true",
+                                    joined,
+                                    pgArrayTypeForBind.replace("'", "''"),
+                                    "&&"
+                                ),
+                                ap
+                            ));
+                        }
+                    }
+                    res = b;
+                }
+                return Optional.of(res);
+            };
+            bindings.bind(arrayPath).all(enumPgArrayOverlapBinding);
         }
 
         bindings.bind(Boolean.class).all((final Path<Boolean> path, final Collection<? extends Boolean> values) -> {
@@ -346,11 +434,6 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
                 }
                 return Optional.of(res);
             });
-
-        bindings.bind(Enum.class).first((path, value) -> {
-            System.out.println("dentro");
-            return null; //To change body of generated lambdas, choose Tools | Templates.
-        });
 
         bindings.bind(String.class).all((Path<String> path, Collection<? extends String> values) -> {
             final List<? extends Object> strings = new ArrayList<>(values);
@@ -647,6 +730,70 @@ public interface NextSdrQueryDslRepository<E extends Object, ID extends Object, 
 //                throw new InvalidFilterException(String.format("operatore %s non valido", stringOperation.getOperator()));
 //        }
         return res;
+    }
+
+    /**
+     * Second type argument of {@link ArrayPath}{@code <A, E>}: elemento dell'array; {@code null} se non è un array di enum.
+     */
+    private static Class<?> resolveArrayPathEnumElementType(Field qField) {
+        Type gen = qField.getGenericType();
+        if (!(gen instanceof ParameterizedType)) {
+            return null;
+        }
+        ParameterizedType pt = (ParameterizedType) gen;
+        if (!ArrayPath.class.isAssignableFrom((Class<?>) pt.getRawType())) {
+            return null;
+        }
+        Type[] args = pt.getActualTypeArguments();
+        if (args.length < 2) {
+            return null;
+        }
+        Type elem = args[1];
+        if (elem instanceof Class<?>) {
+            Class<?> c = (Class<?>) elem;
+            if (Enum.class.isAssignableFrom(c)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Normalizza i valori provenienti dalla query string 
+     * (stringhe, enum, array di valori multipli) in nomi enum per {@code array_operation}.
+     */
+    private static List<String> enumArrayFilterTokens(Object valueObj) {
+        List<String> out = new ArrayList<>();
+        if (valueObj == null) {
+            return out;
+        }
+        if (valueObj instanceof Enum<?>) {
+            out.add(((Enum<?>) valueObj).name());
+            return out;
+        }
+        if (valueObj instanceof String) {
+            String s = (String) valueObj;
+            if (!StringUtils.hasText(s)) {
+                return out;
+            }
+            out.add(s.trim());
+            return out;
+        }
+        if (valueObj instanceof Object[]) {
+            for (Object o : (Object[]) valueObj) {
+                out.addAll(enumArrayFilterTokens(o));
+            }
+            return out;
+        }
+        if (valueObj.getClass().isArray()) {
+            int len = Array.getLength(valueObj);
+            for (int i = 0; i < len; i++) {
+                out.addAll(enumArrayFilterTokens(Array.get(valueObj, i)));
+            }
+            return out;
+        }
+        out.add(String.valueOf(valueObj).trim());
+        return out;
     }
 
 }
