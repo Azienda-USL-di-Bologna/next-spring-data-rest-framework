@@ -55,7 +55,9 @@ public class PostgreSQLFullTextSearchFunction extends StandardSQLFunction {
                     .replace("<", "\\<");
 
                 // al posto degli spazi metto le & per fare la ricerca in and e :* per trovare anche le parole che hanno la stringa come radice
-                value = value.trim().replaceAll("\\s+", ":*&");
+                //value = value.trim().replaceAll("\\s+", ":*&");
+                // Sostituita con questa per BBK-2788, in modo che le lettere singole non ricevano il ":*" altrimenti trovano tutto
+                value = value.trim().replaceAll("\\S{2,}\\s", ":*&");
             } else {
                 value = "";
             }
