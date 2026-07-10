@@ -58,6 +58,7 @@ public class PostgreSQLFullTextSearchFunction extends StandardSQLFunction {
                 //value = value.trim().replaceAll("\\s+", ":*&");
                 // Sostituita con questa per BBK-2788, in modo che le lettere singole non ricevano il ":*" altrimenti trovano tutto
                 value = value.trim().replaceAll("\\S{2,}\\s", ":*&");
+                value = value.trim().replaceAll("\\s+", "&");
             } else {
                 value = "";
             }
